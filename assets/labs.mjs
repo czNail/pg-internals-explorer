@@ -4,7 +4,7 @@ const step = (title, detail, patch = {}) => ({title, detail, patch});
 
 export const labs = {
   buffers: {
-    label:'共享缓冲区', title:'Shared Buffers', icon:'grid', subtitle:'命中、Pin 与时钟扫描',
+    label:'共享缓冲区', title:'Shared Buffers', subtitle:'命中、Pin 与时钟扫描',
     summary:'跟踪一次缓冲命中，再观察缓冲区满时 CLOCK-sweep 如何选出可替换的帧。',
     view:'缓冲帧与映射', context:'3 个教学帧 · 关系 accounts', source:src+'storage/buffer/README',
     legend:'Pin count 表示使用中的引用。Usage count 是替换策略的计数。演示省略空闲帧、访问环及并发竞争。',
@@ -20,7 +20,7 @@ export const labs = {
     ]
   },
   wal: {
-    label:'WAL 与检查点', title:'WAL 与检查点', icon:'log', subtitle:'提交、写页与持久化',
+    label:'WAL 与检查点', title:'WAL 与检查点', subtitle:'提交、写页与持久化',
     summary:'对照 WAL、共享缓冲和关系文件，逐步检查提交成功和数据页持久化的先后关系。',
     view:'WAL 与数据页的持久化状态', context:'本地同步提交 · LSN 为示例值', source:docs+'wal-intro.html',
     legend:'LSN 表示 WAL 中的位置。此处用记录末端位置比较刷写边界，略去 full-page image 等其他记录。',
@@ -35,7 +35,7 @@ export const labs = {
     ]
   },
   mvcc: {
-    label:'MVCC 可见性', title:'MVCC 与事务快照', icon:'layers', subtitle:'同一行的两种视图',
+    label:'MVCC 可见性', title:'MVCC 与事务快照', subtitle:'同一行的两种视图',
     summary:'让一个老读者跨过 UPDATE 的提交，再用新读者读取同一行，比较两份快照看到的版本。',
     view:'行版本与读者视图', context:'A: REPEATABLE READ · B: 写入 · C: 新读者', source:docs+'transaction-iso.html',
     legend:'A 已执行首条需要快照的查询。以下只演示并发更新的可见性，省略行锁、命令 ID 与提示位。',
@@ -49,7 +49,7 @@ export const labs = {
     ]
   },
   hot: {
-    label:'Heap Page / HOT', title:'堆页布局与 HOT 更新', icon:'page', subtitle:'行指针、版本链与剪枝',
+    label:'Heap Page / HOT', title:'堆页布局与 HOT 更新', subtitle:'行指针、版本链与剪枝',
     summary:'看非索引列在同一堆页上的更新怎样复用索引入口，以及剪枝后入口如何继续找到新版本。',
     view:'Block 8 的索引入口与行指针', context:'B-tree 索引 · 同页更新', source:docs+'storage-hot.html',
     legend:'演示索引只引用 id，更新修改 balance，并假设页内有空间。页头和元组偏移以结构示意呈现。',
@@ -62,7 +62,7 @@ export const labs = {
     ]
   },
   vacuum: {
-    label:'VACUUM', title:'VACUUM 与版本回收', icon:'clock', subtitle:'老快照、索引清理与空间复用',
+    label:'VACUUM', title:'VACUUM 与版本回收', subtitle:'老快照、索引清理与空间复用',
     summary:'用一个已提交的 DELETE 观察老快照为什么会阻挡回收，以及索引项和堆页槽如何被清理。',
     view:'堆页、索引与回收边界', context:'普通 VACUUM · 执行索引清理', source:docs+'routine-vacuuming.html',
     legend:'例子选择普通 VACUUM 的一种清理路径。回收的页内空间可供关系复用，文件大小在示例中不变。',

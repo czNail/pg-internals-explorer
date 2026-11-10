@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {modules, routes, workloads, overviewState} from '../assets/overview.mjs';
+import {mapSizes, modules, positions, routes, workloads, overviewState} from '../assets/overview.mjs';
 import {labs, labState} from '../assets/labs.mjs';
 
 test('overview events point to visible routes and module states', () => {
@@ -13,6 +13,18 @@ test('overview events point to visible routes and module states', () => {
     }
   }
   for (const module of Object.values(modules)) assert.ok(labs[module.lab]);
+});
+
+test('both topology layouts place every node and route', () => {
+  for (const [layout, [width, height]] of Object.entries(mapSizes)) {
+    for (const id of Object.keys(modules)) {
+      const [x, y] = positions[id][layout];
+      assert.ok(x > 0 && x < width && y > 0 && y < height, `${layout}: ${id}`);
+    }
+    for (const [id, route] of Object.entries(routes)) {
+      assert.match(route[layout], /^M.+ C/, `${layout}: ${id}`);
+    }
+  }
 });
 
 test('commit acknowledgement, data page write, and file sync remain distinct', () => {

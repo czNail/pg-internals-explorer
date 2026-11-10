@@ -39,21 +39,19 @@
             <div><span class="live-indicator" id="live-state"></span><h2 id="board-title">运行拓扑</h2><span id="play-state" class="live-label"></span></div>
             <p>点模块查看机制</p>
           </div>
-          <div class="board-scroll" tabindex="0" role="region" aria-label="内核运行拓扑，可横向滚动">
-            <div class="stage" id="stage">
-              <div class="zone zone-query"><span>01</span> 会话与执行</div>
-              <div class="zone zone-memory"><span>02</span> 共享内存与数据页</div>
-              <div class="zone zone-storage"><span>03</span> 后台与持久化</div>
-              <svg id="edges" viewBox="0 0 820 436" aria-hidden="true"></svg>
-              <div id="nodes"></div>
-              <svg id="tokens" viewBox="0 0 820 436" aria-hidden="true"></svg>
-            </div>
+          <div class="stage" id="stage">
+            <div class="map-label map-label-session"><i></i>会话与执行</div>
+            <div class="map-label map-label-memory"><i></i>共享内存与数据页</div>
+            <div class="map-label map-label-storage"><i></i>后台与持久化</div>
+            <svg class="map-layer" id="edges" aria-hidden="true"></svg>
+            <div id="nodes"></div>
+            <svg class="map-layer" id="tokens" aria-hidden="true"></svg>
           </div>
           <div class="board-foot">
             <div class="legend" aria-label="数据对象图例">
               <span><i class="sql"></i>请求 / 事务</span><span><i class="page"></i>数据页副本</span><span><i class="wal"></i>WAL 记录</span><span><i class="io"></i>后台 I/O</span>
             </div>
-            <span class="scroll-hint">左右滑动查看拓扑 →</span>
+            <span class="board-note">箭头表示流向</span>
           </div>
         </section>
         <aside class="run-panel" aria-label="运行控制与观察">
@@ -85,7 +83,7 @@
 
     <section id="labs" hidden aria-labelledby="lab-title">
       <div class="intro lab-intro">
-        <div><a class="back" href="#overview">← 返回全局运行图</a><p class="eyebrow" id="lab-kicker"></p><h1 id="lab-title" tabindex="-1"></h1><p class="lede" id="lab-summary"></p></div>
+        <div><a class="back" href="#overview">← 返回全局运行图</a><p class="eyebrow" id="lab-kicker"></p><div class="lab-title-line"><span id="lab-figure" class="lab-figure"></span><h1 id="lab-title" tabindex="-1"></h1></div><p class="lede" id="lab-summary"></p></div>
         <span class="model-label">模块演示 · 可逐步回放</span>
       </div>
       <nav id="lab-nav" class="lab-nav" aria-label="选择模块"></nav>

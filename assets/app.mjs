@@ -1,25 +1,14 @@
-import {modules, routes, workloads, overviewState} from './overview.mjs';
+import {mapSizes, modules, positions, routes, workloads, overviewState} from './overview.mjs';
 import {labs, labState} from './labs.mjs';
+import {labArt, moduleArt} from './module-art.mjs';
 
 const $ = id => document.getElementById(id);
 const escape = value => String(value).replace(/[&<>"']/g, character => ({
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
 }[character]));
 
-const icons = {
-  terminal:'<path d="m4 6 5 6-5 6m9 0h7"/>',
-  cpu:'<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3"/>',
-  layers:'<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 4 9 5 9-5"/>',
-  grid:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/>',
-  page:'<path d="M5 3h9l5 5v13H5zM14 3v5h5M8 12h8m-8 4h8"/>',
-  disk:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14a8 3 0 0 0 16 0V5M4 12a8 3 0 0 0 16 0"/>',
-  log:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',
-  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>'
-};
-
-function icon(name) {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
-}
+const labTones = {buffers:'page', wal:'wal', mvcc:'sql', hot:'page', vacuum:'io'};
+const flowKinds = ['sql', 'page', 'wal', 'io'];
 
 function svg(tag, attributes) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -33,6 +22,7 @@ function markCurrent(element, current, value = 'true') {
 }
 
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
+const compactMap = matchMedia('(max-width: 640px)');
 let workload = workloads.mixed;
 let eventIndex = 0;
 let selectedModule = 'buffers';
@@ -42,6 +32,7 @@ let elapsed = 0;
 let previousTime = 0;
 let animationFrame = 0;
 let activeToken = null;
+let tokenProgress = 0;
 let activeRoute = null;
 let labKey = null;
 let labIndex = 0;
@@ -50,23 +41,44 @@ const paths = {};
 const pathLengths = {};
 const nodeElements = {};
 
+function layoutMap() {
+  const mode = compactMap.matches ? 'compact' : 'wide';
+  const [width, height] = mapSizes[mode];
+  $('stage').style.aspectRatio = `${width} / ${height}`;
+  for (const layer of [$('edges'), $('tokens')]) layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  for (const [id, button] of Object.entries(nodeElements)) {
+    const [x, y] = positions[id][mode];
+    button.style.left = `${x / width * 100}%`;
+    button.style.top = `${y / height * 100}%`;
+  }
+  for (const [id, route] of Object.entries(routes)) {
+    paths[id].setAttribute('d', route[mode]);
+    pathLengths[id] = paths[id].getTotalLength();
+  }
+  if (activeToken) positionToken(tokenProgress);
+}
+
 function setupOverview() {
   $('nodes').innerHTML = Object.entries(modules).map(([id, module]) =>
-    `<button class="node" type="button" data-module="${id}" aria-controls="inspection" style="left:${module.x/8.2}%;top:${module.y/4.36}%;width:${215/8.2}%;height:${68/4.36}%;--node-color:var(--${module.color ?? 'sql'})">
-      <span class="node-title">${icon(module.icon)}${module.name}</span><span class="node-status"></span></button>`
+    `<button class="node art-${module.color ?? 'sql'}" type="button" data-module="${id}" aria-controls="inspection">
+      <span class="node-figure">${moduleArt(id)}</span><span class="node-title">${module.name}</span><span class="node-status"></span></button>`
   ).join('');
   for (const button of $('nodes').querySelectorAll('button')) nodeElements[button.dataset.module] = button;
-  $('edges').innerHTML = `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L6 4 L1 7" fill="none" stroke="#81a292" stroke-width="1.25"/></marker></defs>`;
+  $('edges').innerHTML = `<defs>${flowKinds.map(kind => `
+    <marker id="arrow-${kind}" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path class="${kind} marker-tip" d="M1.5 1.5 7 4.5 1.5 7.5"/>
+    </marker>`).join('')}</defs>`;
   for (const [id, route] of Object.entries(routes)) {
-    const path = svg('path', {class:'route', d:route.path, 'marker-end':'url(#arrow)'});
-    $('edges').append(path);
-    paths[id] = path;
-    pathLengths[id] = path.getTotalLength();
+    paths[id] = svg('path', {class:`route ${route.kind}`, 'marker-end':`url(#arrow-${route.kind})`});
+    $('edges').append(paths[id]);
   }
+  layoutMap();
+  compactMap.addEventListener('change', layoutMap);
+
   $('workloads').innerHTML = Object.entries(workloads).map(([id, option]) =>
     `<button type="button" data-workload="${id}" aria-pressed="${option === workload}">${option.label}</button>`).join('');
   $('lab-cards').innerHTML = Object.entries(labs).map(([id, lab]) =>
-    `<a class="lab-card" href="#${id}"><span class="card-icon">${icon(lab.icon)}</span><span><strong>${lab.label}</strong><small>${lab.subtitle}</small></span><span class="card-arrow" aria-hidden="true">↗</span></a>`).join('');
+    `<a class="lab-card art-${labTones[id]}" href="#${id}"><span class="card-icon">${moduleArt(labArt[id])}</span><span><strong>${lab.label}</strong><small>${lab.subtitle}</small></span><span class="card-arrow" aria-hidden="true">↗</span></a>`).join('');
   $('lab-nav').innerHTML = Object.entries(labs).map(([id, lab]) => `<a href="#${id}">${lab.label}</a>`).join('');
 }
 
@@ -74,7 +86,9 @@ function updateInspection(state) {
   const module = modules[selectedModule];
   if ($('inspection').dataset.module !== selectedModule) {
     $('inspection').dataset.module = selectedModule;
-    $('inspection').innerHTML = `<h3>${module.name}</h3><p>${module.role}</p>
+    $('inspection').innerHTML = `<div class="inspection-heading">
+      <span class="inspection-figure art-${module.color ?? 'sql'}">${moduleArt(selectedModule)}</span><h3>${module.name}</h3></div>
+    <p>${module.role}</p>
     <span class="inspection-status"></span>
     <a class="inspection-link" href="#${module.lab}">查看${labs[module.lab].label}演示 <span aria-hidden="true">↗</span></a>`;
   }
@@ -103,33 +117,35 @@ function renderEvent() {
   const event = workload.steps[eventIndex];
   const state = overviewState(workload, eventIndex);
   const route = routes[event.via];
-  if (activeRoute) paths[activeRoute].setAttribute('class', 'route');
+  if (activeRoute) paths[activeRoute].classList.remove('active');
   activeRoute = event.via;
-  paths[activeRoute].setAttribute('class', `route active ${event.kind}`);
+  paths[activeRoute].classList.add('active');
   for (const [id, button] of Object.entries(nodeElements)) {
     button.querySelector('.node-status').textContent = state[id];
-    button.classList.remove('sql', 'page', 'wal', 'io');
-    button.classList.add(event.kind);
     button.classList.toggle('active', id === route.from || id === route.to || event.targets.includes(id));
     button.classList.toggle('selected', id === selectedModule);
     button.setAttribute('aria-pressed', String(id === selectedModule));
   }
   $('run-counter').textContent = `${String(eventIndex + 1).padStart(2, '0')} / ${String(workload.steps.length).padStart(2, '0')}`;
-  $('run-event').innerHTML = `<h3>${event.title}</h3><p>${event.description}</p><span class="event-object">${escape(event.object)}</span>`;
+  $('run-event').innerHTML = `<h3>${event.title}</h3><p>${event.description}</p>
+    <div class="event-flow ${event.kind}"><span class="event-object">${escape(event.object)}</span>
+    <span class="event-path">${modules[route.from].name} → ${modules[route.to].name}</span></div>`;
   renderProgress();
   updateInspection(state);
 
-  const width = Math.max(53, 14 + event.object.length * 6.3);
-  const rect = svg('rect', {x:-width/2, y:-10, width, height:20, rx:6});
-  const label = svg('text', {x:0, y:0});
+  const width = Math.max(64, 28 + event.object.length * 6.4);
+  const rect = svg('rect', {x:-width/2, y:-11, width, height:22, rx:11});
+  const dot = svg('circle', {cx:11-width/2, cy:0, r:3});
+  const label = svg('text', {x:6, y:0});
   label.textContent = event.object;
   activeToken = svg('g', {class:`flow-token ${event.kind}`});
-  activeToken.append(rect, label);
+  activeToken.append(rect, dot, label);
   $('tokens').replaceChildren(activeToken);
   positionToken(running && !motion.matches ? 0 : .5);
 }
 
 function positionToken(fraction) {
+  tokenProgress = fraction;
   const point = paths[activeRoute].getPointAtLength(pathLengths[activeRoute] * fraction);
   activeToken.setAttribute('transform', `translate(${point.x} ${point.y})`);
 }
@@ -251,6 +267,8 @@ function openLab(key) {
   labIndex = 0;
   $('lab-kicker').textContent = `MODULE LABS / ${String(Object.keys(labs).indexOf(key) + 1).padStart(2, '0')}`;
   $('lab-title').textContent = lab.title;
+  $('lab-figure').className = `lab-figure art-${labTones[key]}`;
+  $('lab-figure').innerHTML = moduleArt(labArt[key]);
   $('lab-summary').textContent = lab.summary;
   $('model-title').textContent = lab.view;
   $('lab-context').textContent = lab.context;

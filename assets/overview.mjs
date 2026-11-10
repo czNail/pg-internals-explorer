@@ -1,27 +1,52 @@
 export const modules = {
-  client: {name:'Client', icon:'terminal', x:28, y:68, role:'发送 SQL 并接收结果。请求与结果通过当前会话往返。', lab:'mvcc'},
-  backend: {name:'Backend', icon:'cpu', x:28, y:186, role:'服务端会话进程。执行语句、访问缓冲页，并在需要时插入或刷写 WAL。', lab:'buffers'},
-  snapshot: {name:'MVCC 快照', icon:'layers', x:28, y:304, role:'记录读者看到的事务视图。可见性检查将快照与行版本的事务信息结合起来。', lab:'mvcc'},
-  buffers: {name:'Shared Buffers', icon:'grid', x:302, y:68, role:'共享缓冲区保存关系页副本。帧描述符记录页标识、引用计数和 Dirty 等状态。', lab:'buffers', color:'page'},
-  heap: {name:'Heap Page', icon:'page', x:302, y:186, role:'缓冲区中的堆页放着行指针和元组。更新可在页内创建新的行版本。', lab:'hot', color:'page'},
-  wal: {name:'WAL Buffers', icon:'log', x:302, y:304, role:'接收新插入的 WAL 记录。插入位置与已持久化位置分别推进。', lab:'wal', color:'wal'},
-  relation: {name:'关系文件', icon:'disk', x:577, y:68, role:'存放堆和索引的数据页。写入文件与确认持久化是两个独立阶段。', lab:'wal', color:'io'},
-  checkpointer: {name:'Checkpointer', icon:'clock', x:577, y:186, role:'写出本轮检查点所需的数据页并同步文件，推进恢复起点。', lab:'wal', color:'io'},
-  walfile: {name:'WAL Files', icon:'log', x:577, y:304, role:'持久化 WAL 记录。崩溃恢复可用已经持久化的日志重做数据页修改。', lab:'wal', color:'wal'}
+  client: {name:'Client', role:'发送 SQL 并接收结果。请求与结果通过当前会话往返。', lab:'mvcc'},
+  backend: {name:'Backend', role:'服务端会话进程。执行语句、访问缓冲页，并在需要时插入或刷写 WAL。', lab:'buffers'},
+  snapshot: {name:'MVCC 快照', role:'记录读者看到的事务视图。可见性检查将快照与行版本的事务信息结合起来。', lab:'mvcc'},
+  buffers: {name:'Shared Buffers', role:'共享缓冲区保存关系页副本。帧描述符记录页标识、引用计数和 Dirty 等状态。', lab:'buffers', color:'page'},
+  heap: {name:'Heap Page', role:'缓冲区中的堆页放着行指针和元组。更新可在页内创建新的行版本。', lab:'hot', color:'page'},
+  wal: {name:'WAL Buffers', role:'接收新插入的 WAL 记录。插入位置与已持久化位置分别推进。', lab:'wal', color:'wal'},
+  relation: {name:'关系文件', role:'存放堆和索引的数据页。写入文件与确认持久化是两个独立阶段。', lab:'wal', color:'io'},
+  checkpointer: {name:'Checkpointer', role:'写出本轮检查点所需的数据页并同步文件，推进恢复起点。', lab:'wal', color:'io'},
+  walfile: {name:'WAL Files', role:'持久化 WAL 记录。崩溃恢复可用已经持久化的日志重做数据页修改。', lab:'wal', color:'wal'}
+};
+
+// Coordinates place the center of each illustration. Labels sit underneath.
+export const mapSizes = {wide:[920, 502], compact:[380, 576]};
+export const positions = {
+  client:       {wide:[114,112], compact:[68,55]},
+  backend:      {wide:[207,248], compact:[200,125]},
+  snapshot:     {wide:[114,393], compact:[69,199]},
+  buffers:      {wide:[457,113], compact:[187,252]},
+  heap:         {wide:[491,266], compact:[61,358]},
+  wal:          {wide:[443,400], compact:[149,459]},
+  relation:     {wide:[763,104], compact:[308,205]},
+  checkpointer: {wide:[778,242], compact:[309,344]},
+  walfile:      {wide:[752,390], compact:[296,502]}
 };
 
 export const routes = {
-  request: {from:'client', to:'backend', path:'M125 136 V185'},
-  response: {from:'backend', to:'client', path:'M146 186 V137'},
-  lookup: {from:'backend', to:'buffers', path:'M243 207 H268 V102 H301'},
-  load: {from:'relation', to:'buffers', path:'M577 94 H518'},
-  write: {from:'buffers', to:'relation', path:'M517 120 H576'},
-  access: {from:'buffers', to:'heap', path:'M406 136 V185'},
-  snapshot: {from:'backend', to:'snapshot', path:'M135 254 V303'},
-  insertWal: {from:'backend', to:'wal', path:'M243 233 H269 V337 H301'},
-  flush: {from:'wal', to:'walfile', path:'M517 337 H576'},
-  scan: {from:'checkpointer', to:'buffers', path:'M577 218 H551 V137 H518'},
-  sync: {from:'checkpointer', to:'relation', path:'M685 186 V137'}
+  request: {from:'client', to:'backend', kind:'sql',
+    wide:'M143 121 C177 129 166 190 193 220', compact:'M93 59 C134 60 143 97 173 112'},
+  response: {from:'backend', to:'client', kind:'sql',
+    wide:'M210 220 C184 191 193 131 145 107', compact:'M173 124 C134 116 125 77 93 70'},
+  lookup: {from:'backend', to:'buffers', kind:'page',
+    wide:'M243 238 C326 228 310 121 417 112', compact:'M202 150 C241 165 239 209 203 229'},
+  load: {from:'relation', to:'buffers', kind:'page',
+    wide:'M733 94 C681 44 565 56 493 100', compact:'M282 194 C249 173 220 194 196 229'},
+  write: {from:'buffers', to:'relation', kind:'page',
+    wide:'M494 116 C556 91 654 81 732 110', compact:'M214 247 C245 242 257 211 282 207'},
+  access: {from:'buffers', to:'heap', kind:'page',
+    wide:'M492 125 C566 161 561 213 523 244', compact:'M161 254 C121 251 117 310 86 343'},
+  snapshot: {from:'backend', to:'snapshot', kind:'sql',
+    wide:'M179 265 C146 281 158 339 138 371', compact:'M174 132 C122 128 120 171 94 186'},
+  insertWal: {from:'backend', to:'wal', kind:'wal',
+    wide:'M240 262 C314 266 317 390 407 400', compact:'M225 131 C270 155 258 385 174 443'},
+  flush: {from:'wal', to:'walfile', kind:'wal',
+    wide:'M481 392 C545 339 651 348 716 383', compact:'M175 456 C217 451 239 497 269 499'},
+  scan: {from:'checkpointer', to:'buffers', kind:'io',
+    wide:'M744 231 C668 216 666 121 503 128', compact:'M282 337 C251 331 257 276 214 263'},
+  sync: {from:'checkpointer', to:'relation', kind:'io',
+    wide:'M809 224 C861 199 853 141 795 113', compact:'M332 333 C375 307 370 244 332 217'}
 };
 
 const step = (title, description, object, kind, via, updates, targets = []) =>
