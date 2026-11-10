@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "name": "PostgreSQL 内核演示",
+  "description": "交互式演示 PostgreSQL 内核各模块的工作机制。",
+  "label": "数据库内核",
+  "tags": ["PostgreSQL", "交互演示"],
+  "icon": "./assets/explorer.svg",
+  "tool": {
+    "url": "https://cznail.github.io/pg-internals-explorer/",
+    "features": ["全局架构与对象流动", "模块机制单步回放"],
+    "status": "available"
+  }
+}

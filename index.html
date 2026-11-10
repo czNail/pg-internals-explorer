@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="交互式演示 PostgreSQL 内核各模块的工作机制。">
+  <meta name="color-scheme" content="light">
+  <title>PostgreSQL Internals Explorer</title>
+  <link rel="icon" href="./assets/explorer.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script type="module" src="./assets/app.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到内容</a>
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="#overview"><img src="./assets/explorer.svg" width="36" height="36" alt=""><span>PostgreSQL<strong>Internals Explorer</strong></span></a>
+      <nav aria-label="主导航">
+        <a id="nav-overview" href="#overview">全局运行</a>
+        <a id="nav-labs" href="#buffers">模块演示</a>
+      </nav>
+      <a class="top-link" href="https://github.com/czNail/pg-internals-explorer">GitHub <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+
+  <main id="main" class="shell" tabindex="-1">
+    <section id="overview" aria-labelledby="overview-title">
+      <div class="intro">
+        <div>
+          <p class="eyebrow"><i></i> POSTGRESQL INTERNALS</p>
+          <h1 id="overview-title" tabindex="-1">PostgreSQL 内核运行图</h1>
+          <p class="lede">沿着固定的架构图，观察一条请求如何访问数据页、创建行版本，并写入 WAL。</p>
+        </div>
+        <span class="model-label">机制演示 · 教学模型</span>
+      </div>
+      <div class="overview-grid">
+        <section class="board" aria-labelledby="board-title">
+          <div class="board-head">
+            <div><span class="live-indicator" id="live-state"></span><h2 id="board-title">运行拓扑</h2><span id="play-state" class="live-label"></span></div>
+            <p>点模块查看机制</p>
+          </div>
+          <div class="board-scroll" tabindex="0" role="region" aria-label="内核运行拓扑，可横向滚动">
+            <div class="stage" id="stage">
+              <div class="zone zone-query"><span>01</span> 会话与执行</div>
+              <div class="zone zone-memory"><span>02</span> 共享内存与数据页</div>
+              <div class="zone zone-storage"><span>03</span> 后台与持久化</div>
+              <svg id="edges" viewBox="0 0 820 436" aria-hidden="true"></svg>
+              <div id="nodes"></div>
+              <svg id="tokens" viewBox="0 0 820 436" aria-hidden="true"></svg>
+            </div>
+          </div>
+          <div class="board-foot">
+            <div class="legend" aria-label="数据对象图例">
+              <span><i class="sql"></i>请求 / 事务</span><span><i class="page"></i>数据页副本</span><span><i class="wal"></i>WAL 记录</span><span><i class="io"></i>后台 I/O</span>
+            </div>
+            <span class="scroll-hint">左右滑动查看拓扑 →</span>
+          </div>
+        </section>
+        <aside class="run-panel" aria-label="运行控制与观察">
+          <div class="panel-section">
+            <div class="panel-heading"><span class="index">01</span><h2>选择负载</h2></div>
+            <div class="workloads" id="workloads" aria-label="负载"></div>
+            <div class="control-row">
+              <button id="run-toggle" class="primary" type="button"></button>
+              <button id="run-next" class="secondary" type="button">下一步</button>
+              <label class="speed"><span class="sr-only">播放速度</span><select id="speed"><option value=".65">0.65×</option><option value="1" selected>1×</option><option value="1.65">1.65×</option></select></label>
+            </div>
+          </div>
+          <div class="panel-section event-section">
+            <div class="panel-heading"><span class="index">02</span><h2>当前事件</h2><span class="step-count" id="run-counter"></span></div>
+            <div id="run-event"></div>
+            <div id="run-progress" class="run-progress" aria-label="事件进度"></div>
+          </div>
+          <div class="panel-section module-section">
+            <div class="panel-heading"><span class="index">03</span><h2>模块检查</h2></div>
+            <div id="inspection"></div>
+          </div>
+        </aside>
+      </div>
+      <section class="entries" aria-labelledby="entries-title">
+        <div class="entries-head"><div><p class="eyebrow">MODULE LABS</p><h2 id="entries-title">深入模块</h2></div><p>选一个机制，逐步检查对象状态。</p></div>
+        <div id="lab-cards" class="lab-cards"></div>
+      </section>
+    </section>
+
+    <section id="labs" hidden aria-labelledby="lab-title">
+      <div class="intro lab-intro">
+        <div><a class="back" href="#overview">← 返回全局运行图</a><p class="eyebrow" id="lab-kicker"></p><h1 id="lab-title" tabindex="-1"></h1><p class="lede" id="lab-summary"></p></div>
+        <span class="model-label">模块演示 · 可逐步回放</span>
+      </div>
+      <nav id="lab-nav" class="lab-nav" aria-label="选择模块"></nav>
+      <div class="lab-layout">
+        <section class="lab-board" aria-labelledby="model-title">
+          <div class="lab-board-head"><div><p class="eyebrow">STATE VIEW</p><h2 id="model-title"></h2></div><span class="state-caption" id="lab-context"></span></div>
+          <div id="lab-model" class="lab-model"></div>
+          <div class="lab-legend" id="lab-legend"></div>
+        </section>
+        <aside class="lesson" aria-labelledby="lesson-title">
+          <div class="lesson-current">
+            <div class="panel-heading"><span class="index">→</span><h2 id="lesson-title">这一步发生了什么</h2></div>
+            <div id="lab-explanation" aria-live="polite" aria-atomic="true"></div>
+          </div>
+          <div class="lesson-timeline">
+            <div class="panel-heading"><span class="index">≡</span><h2>步骤</h2><span class="step-count" id="lab-counter"></span></div>
+            <ol id="lab-steps"></ol>
+          </div>
+        </aside>
+      </div>
+      <div class="playback">
+        <div class="playback-buttons"><button class="secondary" id="lab-reset" type="button" title="回到初始状态">↺ 重置</button><button class="secondary" id="lab-prev" type="button">← 上一步</button><button class="primary" id="lab-play" type="button"></button><button class="secondary" id="lab-next" type="button">下一步 →</button></div>
+        <a id="lab-source" target="_blank" rel="noopener noreferrer">查阅 PostgreSQL 资料 ↗</a>
+      </div>
+    </section>
+    <noscript><p class="noscript">请启用 JavaScript 以运行交互演示。</p></noscript>
+    <footer><span>PostgreSQL Internals Explorer</span><span>基于 PostgreSQL 18 的简化机制模型</span><a href="https://cznail.github.io/">返回个人主页 ↗</a></footer>
+  </main>
+</body>
+</html>
