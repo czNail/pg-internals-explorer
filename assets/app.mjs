@@ -9,6 +9,10 @@ const escape = value => String(value).replace(/[&<>"']/g, character => ({
 
 const labTones = {buffers:'page', wal:'wal', mvcc:'sql', hot:'page', vacuum:'io'};
 const flowKinds = ['sql', 'page', 'wal', 'io'];
+const autoDuration = 2700;
+const autoTravel = 1950;
+const stepTravel = 1350;
+const fadeDuration = 220;
 
 function svg(tag, attributes) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -27,12 +31,14 @@ let workload = workloads.mixed;
 let eventIndex = 0;
 let selectedModule = 'buffers';
 let running = !motion.matches;
+let stepping = false;
 let overviewVisible = false;
 let elapsed = 0;
+let travelDuration = autoTravel;
 let previousTime = 0;
 let animationFrame = 0;
 let activeToken = null;
-let tokenProgress = 0;
+const fadingTokens = new Set();
 let activeRoute = null;
 let labKey = null;
 let labIndex = 0;
@@ -55,7 +61,8 @@ function layoutMap() {
     paths[id].setAttribute('d', route[mode]);
     pathLengths[id] = paths[id].getTotalLength();
   }
-  if (activeToken) positionToken(tokenProgress);
+  if (activeToken) paintToken(activeToken);
+  for (const token of fadingTokens) paintToken(token);
 }
 
 function setupOverview() {
@@ -127,53 +134,86 @@ function renderEvent() {
     button.setAttribute('aria-pressed', String(id === selectedModule));
   }
   $('run-counter').textContent = `${String(eventIndex + 1).padStart(2, '0')} / ${String(workload.steps.length).padStart(2, '0')}`;
-  $('run-event').innerHTML = `<h3>${event.title}</h3><p>${event.description}</p>
+  $('run-title').textContent = event.title;
+  $('run-event').innerHTML = `<p>${event.description}</p>
     <div class="event-flow ${event.kind}"><span class="event-object">${escape(event.object)}</span>
     <span class="event-path">${modules[route.from].name} → ${modules[route.to].name}</span></div>`;
   renderProgress();
   updateInspection(state);
+}
 
+function createToken(event) {
   const width = Math.max(64, 28 + event.object.length * 6.4);
   const rect = svg('rect', {x:-width/2, y:-11, width, height:22, rx:11});
   const dot = svg('circle', {cx:11-width/2, cy:0, r:3});
   const label = svg('text', {x:6, y:0});
   label.textContent = event.object;
-  activeToken = svg('g', {class:`flow-token ${event.kind}`});
-  activeToken.append(rect, dot, label);
-  $('tokens').replaceChildren(activeToken);
-  positionToken(running && !motion.matches ? 0 : .5);
+  const element = svg('g', {class:`flow-token ${event.kind}`, opacity:0});
+  element.append(rect, dot, label);
+  $('tokens').append(element);
+  return {element, route:event.via, progress:0, opacity:0};
 }
 
-function positionToken(fraction) {
-  tokenProgress = fraction;
-  const point = paths[activeRoute].getPointAtLength(pathLengths[activeRoute] * fraction);
-  activeToken.setAttribute('transform', `translate(${point.x} ${point.y})`);
+function paintToken(token) {
+  const point = paths[token.route].getPointAtLength(pathLengths[token.route] * token.progress);
+  token.element.setAttribute('transform', `translate(${point.x} ${point.y})`);
+  token.element.setAttribute('opacity', token.opacity);
+}
+
+function paintFrame(delta = 0) {
+  const fraction = Math.min(elapsed / travelDuration, 1);
+  activeToken.progress = motion.matches ? .5 : fraction * fraction * (3 - 2 * fraction);
+  activeToken.opacity = motion.matches ? 1 : Math.min(elapsed / fadeDuration, 1);
+  paintToken(activeToken);
+  for (const token of fadingTokens) {
+    token.opacity = Math.max(0, token.opacity - delta / fadeDuration);
+    if (motion.matches || token.opacity === 0) {
+      token.element.remove();
+      fadingTokens.delete(token);
+    } else {
+      token.element.setAttribute('opacity', token.opacity);
+    }
+  }
 }
 
 function selectEvent(index) {
   eventIndex = (index + workload.steps.length) % workload.steps.length;
   elapsed = 0;
+  travelDuration = running ? autoTravel : stepTravel;
+  stepping = !running && !motion.matches;
+  if (activeToken) fadingTokens.add(activeToken);
+  activeToken = createToken(workload.steps[eventIndex]);
   renderEvent();
+  paintFrame();
 }
 
 function animate(time) {
   animationFrame = 0;
-  if (!running || !overviewVisible || document.hidden) return;
-  if (previousTime) elapsed += Math.min(time - previousTime, 80) * Number($('speed').value);
+  if (!(running || stepping) || !overviewVisible || document.hidden) return;
+  const delta = previousTime ? (time - previousTime) * Number($('speed').value) : 0;
   previousTime = time;
-  if (elapsed >= 2700) selectEvent(eventIndex + 1);
-  positionToken(motion.matches ? .5 : Math.min(elapsed / 2060, 1));
-  animationFrame = requestAnimationFrame(animate);
+  elapsed += delta;
+  paintFrame(delta);
+  if (running && elapsed >= autoDuration) selectEvent(eventIndex + 1);
+  if (stepping && elapsed >= travelDuration) {
+    stepping = false;
+    updateOverviewControls();
+  }
+  if (running || stepping) animationFrame = requestAnimationFrame(animate);
+}
+
+function updateOverviewControls() {
+  $('play-state').textContent = running ? '播放中' : stepping ? '单步中' : '已暂停';
+  $('live-state').classList.toggle('running', running || stepping);
+  $('run-toggle').textContent = running ? 'Ⅱ 暂停' : '▶ 播放';
 }
 
 function syncOverview() {
-  $('play-state').textContent = running ? '播放中' : '已暂停';
-  $('live-state').classList.toggle('running', running);
-  $('run-toggle').textContent = running ? 'Ⅱ 暂停' : '▶ 播放';
+  updateOverviewControls();
   if (animationFrame) cancelAnimationFrame(animationFrame);
   animationFrame = 0;
   previousTime = 0;
-  if (running && overviewVisible && !document.hidden) animationFrame = requestAnimationFrame(animate);
+  if ((running || stepping) && overviewVisible && !document.hidden) animationFrame = requestAnimationFrame(animate);
 }
 
 function modelCard(title, values, className = '') {
@@ -302,7 +342,7 @@ function renderLocation(focusHeading = false) {
 }
 
 setupOverview();
-renderEvent();
+selectEvent(0);
 renderLocation();
 
 $('workloads').addEventListener('click', event => {
@@ -311,8 +351,13 @@ $('workloads').addEventListener('click', event => {
   workload = workloads[button.dataset.workload];
   for (const option of $('workloads').children) option.setAttribute('aria-pressed', String(option === button));
   selectEvent(0);
+  syncOverview();
 });
-$('run-toggle').addEventListener('click', () => { running = !running; syncOverview(); });
+$('run-toggle').addEventListener('click', () => {
+  running = !running;
+  stepping = false;
+  syncOverview();
+});
 $('run-next').addEventListener('click', () => { running = false; selectEvent(eventIndex + 1); syncOverview(); });
 $('run-progress').addEventListener('click', event => {
   const button = event.target.closest('[data-event]');
@@ -330,7 +375,7 @@ $('nodes').addEventListener('click', event => {
     node.setAttribute('aria-pressed', String(node === button));
   }
   updateInspection(overviewState(workload, eventIndex));
-  if (matchMedia('(max-width: 760px)').matches) $('inspection').scrollIntoView({block:'nearest'});
+  $('inspection').scrollIntoView({block:'nearest', behavior:motion.matches ? 'instant' : 'smooth'});
 });
 
 function goToLabStep(index) {
@@ -365,6 +410,7 @@ document.addEventListener('visibilitychange', syncOverview);
 motion.addEventListener('change', event => {
   if (!event.matches) return;
   running = false;
-  if (activeToken) positionToken(.5);
+  stepping = false;
+  paintFrame();
   syncOverview();
 });

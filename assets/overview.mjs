@@ -11,42 +11,42 @@ export const modules = {
 };
 
 // Coordinates place the center of each illustration. Labels sit underneath.
-export const mapSizes = {wide:[920, 502], compact:[380, 576]};
+export const mapSizes = {wide:[920, 430], compact:[380, 576]};
 export const positions = {
-  client:       {wide:[114,112], compact:[68,55]},
-  backend:      {wide:[207,248], compact:[200,125]},
-  snapshot:     {wide:[114,393], compact:[69,199]},
-  buffers:      {wide:[457,113], compact:[187,252]},
-  heap:         {wide:[491,266], compact:[61,358]},
-  wal:          {wide:[443,400], compact:[149,459]},
-  relation:     {wide:[763,104], compact:[308,205]},
-  checkpointer: {wide:[778,242], compact:[309,344]},
-  walfile:      {wide:[752,390], compact:[296,502]}
+  client:       {wide:[114,96], compact:[68,55]},
+  backend:      {wide:[207,212], compact:[200,125]},
+  snapshot:     {wide:[114,337], compact:[69,199]},
+  buffers:      {wide:[457,97], compact:[187,252]},
+  heap:         {wide:[491,228], compact:[61,358]},
+  wal:          {wide:[443,343], compact:[149,459]},
+  relation:     {wide:[763,89], compact:[308,205]},
+  checkpointer: {wide:[778,207], compact:[309,344]},
+  walfile:      {wide:[752,334], compact:[296,502]}
 };
 
 export const routes = {
   request: {from:'client', to:'backend', kind:'sql',
-    wide:'M143 121 C177 129 166 190 193 220', compact:'M93 59 C134 60 143 97 173 112'},
+    wide:'M143 104 C177 110 166 163 193 188', compact:'M93 59 C134 60 143 97 173 112'},
   response: {from:'backend', to:'client', kind:'sql',
-    wide:'M210 220 C184 191 193 131 145 107', compact:'M173 124 C134 116 125 77 93 70'},
+    wide:'M210 188 C184 164 193 112 145 92', compact:'M173 124 C134 116 125 77 93 70'},
   lookup: {from:'backend', to:'buffers', kind:'page',
-    wide:'M243 238 C326 228 310 121 417 112', compact:'M202 150 C241 165 239 209 203 229'},
+    wide:'M243 204 C326 195 310 104 417 96', compact:'M202 150 C241 165 239 209 203 229'},
   load: {from:'relation', to:'buffers', kind:'page',
-    wide:'M733 94 C681 44 565 56 493 100', compact:'M282 194 C249 173 220 194 196 229'},
+    wide:'M733 81 C681 38 565 48 493 86', compact:'M282 194 C249 173 220 194 196 229'},
   write: {from:'buffers', to:'relation', kind:'page',
-    wide:'M494 116 C556 91 654 81 732 110', compact:'M214 247 C245 242 257 211 282 207'},
+    wide:'M494 99 C556 78 654 69 732 94', compact:'M214 247 C245 242 257 211 282 207'},
   access: {from:'buffers', to:'heap', kind:'page',
-    wide:'M492 125 C566 161 561 213 523 244', compact:'M161 254 C121 251 117 310 86 343'},
+    wide:'M492 107 C566 138 561 182 523 209', compact:'M161 254 C121 251 117 310 86 343'},
   snapshot: {from:'backend', to:'snapshot', kind:'sql',
-    wide:'M179 265 C146 281 158 339 138 371', compact:'M174 132 C122 128 120 171 94 186'},
+    wide:'M179 227 C146 241 158 290 138 318', compact:'M174 132 C122 128 120 171 94 186'},
   insertWal: {from:'backend', to:'wal', kind:'wal',
-    wide:'M240 262 C314 266 317 390 407 400', compact:'M225 131 C270 155 258 385 174 443'},
+    wide:'M240 224 C314 228 317 334 407 343', compact:'M225 131 C270 155 258 385 174 443'},
   flush: {from:'wal', to:'walfile', kind:'wal',
-    wide:'M481 392 C545 339 651 348 716 383', compact:'M175 456 C217 451 239 497 269 499'},
+    wide:'M481 336 C545 290 651 298 716 328', compact:'M175 456 C217 451 239 497 269 499'},
   scan: {from:'checkpointer', to:'buffers', kind:'io',
-    wide:'M744 231 C668 216 666 121 503 128', compact:'M282 337 C251 331 257 276 214 263'},
+    wide:'M744 198 C668 185 666 104 503 110', compact:'M282 337 C251 331 257 276 214 263'},
   sync: {from:'checkpointer', to:'relation', kind:'io',
-    wide:'M809 224 C861 199 853 141 795 113', compact:'M332 333 C375 307 370 244 332 217'}
+    wide:'M809 192 C861 170 853 121 795 97', compact:'M332 333 C375 307 370 244 332 217'}
 };
 
 const step = (title, description, object, kind, via, updates, targets = []) =>

@@ -33,48 +33,47 @@
         </div>
         <span class="model-label">机制演示 · 教学模型</span>
       </div>
-      <div class="overview-grid">
-        <section class="board" aria-labelledby="board-title">
+      <section class="board" aria-labelledby="board-title">
+        <div class="board-toolbar">
           <div class="board-head">
-            <div><span class="live-indicator" id="live-state"></span><h2 id="board-title">运行拓扑</h2><span id="play-state" class="live-label"></span></div>
-            <p>点模块查看机制</p>
-          </div>
-          <div class="stage" id="stage">
-            <div class="map-label map-label-session"><i></i>会话与执行</div>
-            <div class="map-label map-label-memory"><i></i>共享内存与数据页</div>
-            <div class="map-label map-label-storage"><i></i>后台与持久化</div>
-            <svg class="map-layer" id="edges" aria-hidden="true"></svg>
-            <div id="nodes"></div>
-            <svg class="map-layer" id="tokens" aria-hidden="true"></svg>
-          </div>
-          <div class="board-foot">
-            <div class="legend" aria-label="数据对象图例">
-              <span><i class="sql"></i>请求 / 事务</span><span><i class="page"></i>数据页副本</span><span><i class="wal"></i>WAL 记录</span><span><i class="io"></i>后台 I/O</span>
-            </div>
-            <span class="board-note">箭头表示流向</span>
-          </div>
-        </section>
-        <aside class="run-panel" aria-label="运行控制与观察">
-          <div class="panel-section">
-            <div class="panel-heading"><span class="index">01</span><h2>选择负载</h2></div>
-            <div class="workloads" id="workloads" aria-label="负载"></div>
+            <div class="board-heading"><span class="live-indicator" id="live-state"></span><h2 id="board-title">运行拓扑</h2><span id="play-state" class="live-label"></span></div>
+            <div class="workloads" id="workloads" role="group" aria-label="选择负载"></div>
             <div class="control-row">
               <button id="run-toggle" class="primary" type="button"></button>
               <button id="run-next" class="secondary" type="button">下一步</button>
               <label class="speed"><span class="sr-only">播放速度</span><select id="speed"><option value=".65">0.65×</option><option value="1" selected>1×</option><option value="1.65">1.65×</option></select></label>
             </div>
           </div>
-          <div class="panel-section event-section">
-            <div class="panel-heading"><span class="index">02</span><h2>当前事件</h2><span class="step-count" id="run-counter"></span></div>
-            <div id="run-event"></div>
-            <div id="run-progress" class="run-progress" aria-label="事件进度"></div>
+          <div class="event-ribbon">
+            <span class="step-count" id="run-counter"></span><span id="run-title"></span>
+            <div id="run-progress" class="run-progress" role="group" aria-label="事件进度"></div>
           </div>
-          <div class="panel-section module-section">
-            <div class="panel-heading"><span class="index">03</span><h2>模块检查</h2></div>
-            <div id="inspection"></div>
+        </div>
+        <div class="stage" id="stage">
+          <div class="map-label map-label-session"><i></i>会话与执行</div>
+          <div class="map-label map-label-memory"><i></i>共享内存与数据页</div>
+          <div class="map-label map-label-storage"><i></i>后台与持久化</div>
+          <svg class="map-layer" id="edges" aria-hidden="true"></svg>
+          <div id="nodes"></div>
+          <svg class="map-layer" id="tokens" aria-hidden="true"></svg>
+        </div>
+        <div class="board-foot">
+          <div class="legend" aria-label="数据对象图例">
+            <span><i class="sql"></i>请求 / 事务</span><span><i class="page"></i>数据页副本</span><span><i class="wal"></i>WAL 记录</span><span><i class="io"></i>后台 I/O</span>
           </div>
-        </aside>
-      </div>
+          <span class="board-note">点模块查看机制</span>
+        </div>
+      </section>
+      <aside class="run-panel" aria-label="事件说明与模块检查">
+        <div class="panel-section event-section">
+          <div class="panel-heading"><span class="index">01</span><h2>当前事件</h2></div>
+          <div id="run-event"></div>
+        </div>
+        <div class="panel-section module-section">
+          <div class="panel-heading"><span class="index">02</span><h2>模块检查</h2></div>
+          <div id="inspection"></div>
+        </div>
+      </aside>
       <section class="entries" aria-labelledby="entries-title">
         <div class="entries-head"><div><p class="eyebrow">MODULE LABS</p><h2 id="entries-title">深入模块</h2></div><p>选一个机制，逐步检查对象状态。</p></div>
         <div id="lab-cards" class="lab-cards"></div>
@@ -87,6 +86,10 @@
         <span class="model-label">模块演示 · 可逐步回放</span>
       </div>
       <nav id="lab-nav" class="lab-nav" aria-label="选择模块"></nav>
+      <div class="playback">
+        <div class="playback-buttons"><button class="secondary" id="lab-reset" type="button" title="回到初始状态">↺ 重置</button><button class="secondary" id="lab-prev" type="button">← 上一步</button><button class="primary" id="lab-play" type="button"></button><button class="secondary" id="lab-next" type="button">下一步 →</button></div>
+        <a id="lab-source" target="_blank" rel="noopener noreferrer">查阅 PostgreSQL 资料 ↗</a>
+      </div>
       <div class="lab-layout">
         <section class="lab-board" aria-labelledby="model-title">
           <div class="lab-board-head"><div><p class="eyebrow">STATE VIEW</p><h2 id="model-title"></h2></div><span class="state-caption" id="lab-context"></span></div>
@@ -103,10 +106,6 @@
             <ol id="lab-steps"></ol>
           </div>
         </aside>
-      </div>
-      <div class="playback">
-        <div class="playback-buttons"><button class="secondary" id="lab-reset" type="button" title="回到初始状态">↺ 重置</button><button class="secondary" id="lab-prev" type="button">← 上一步</button><button class="primary" id="lab-play" type="button"></button><button class="secondary" id="lab-next" type="button">下一步 →</button></div>
-        <a id="lab-source" target="_blank" rel="noopener noreferrer">查阅 PostgreSQL 资料 ↗</a>
       </div>
     </section>
     <noscript><p class="noscript">请启用 JavaScript 以运行交互演示。</p></noscript>
