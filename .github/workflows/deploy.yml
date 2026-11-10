@@ -1,0 +1,46 @@
+name: Deploy PostgreSQL Internals Explorer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      PAGES_ARTIFACT: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test
+      - uses: actions/configure-pages@v5
+      - name: Stage static site
+        run: |
+          mkdir -p dist
+          cp index.html dist/
+          cp -R assets dist/assets
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          name: ${{ env.PAGES_ARTIFACT }}
+          path: dist
+      - uses: actions/deploy-pages@v4
+        id: deployment
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT }}

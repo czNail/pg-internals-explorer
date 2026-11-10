@@ -24,4 +24,6 @@ python3 -m http.server 4173
 
 ## 发布与主页接入
 
-GitHub Pages 从 `main` 的仓库根目录发布即可。页面使用相对资源路径，可部署在项目子路径。项目根目录的 `homepage.json` 声明工具入口，个人主页在重新同步项目目录并部署后即可读取。
+在仓库的 **Settings → Pages** 中将发布来源设为 **GitHub Actions**。推送到 `main` 时，部署工作流会运行测试并发布静态文件。也可以在 **Actions → Deploy PostgreSQL Internals Explorer** 中手动运行。
+
+页面使用相对资源路径，可部署在项目子路径。项目根目录的 `homepage.json` 声明工具入口，站点上线后，个人主页会在下一次项目目录同步和部署时加入该入口。
