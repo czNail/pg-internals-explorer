@@ -108,7 +108,12 @@ h1 { font-size: clamp(25px, 3.2vw, 40px); font-weight: 760; letter-spacing: -.04
 .route { stroke-opacity: .47; transition: stroke-opacity .22s ease, stroke-width .22s ease; }
 .route.active { stroke-width: 2.65; stroke-opacity: 1; }
 .marker-tip { stroke-opacity: .7; }
-.flow-token { color: var(--flow); filter: drop-shadow(0 2px 3px #24342c24); }
+.route-bridge {
+  fill: none; stroke: #87998e; stroke-width: 1.25; stroke-dasharray: 3 5;
+  stroke-linecap: round; stroke-opacity: .8; visibility: hidden;
+}
+.route-bridge.connecting { visibility: visible; }
+.flow-token { color: var(--flow); transition: color .32s ease; filter: drop-shadow(0 2px 3px #24342c24); }
 .flow-token rect { fill: #fff; stroke: currentColor; stroke-width: 1.25; }
 .flow-token circle { fill: currentColor; }
 .flow-token text { fill: #243b34; font: 700 11px var(--mono); text-anchor: middle; dominant-baseline: central; }
@@ -147,6 +152,7 @@ h1 { font-size: clamp(25px, 3.2vw, 40px); font-weight: 760; letter-spacing: -.04
 .legend { flex-wrap: wrap; gap: 7px 14px; }
 .legend span { gap: 6px; white-space: nowrap; }
 .legend i { width: 13px; height: 3px; border-radius: 3px; background: var(--flow); }
+.legend .bridge-key { height: 0; border-top: 1px dashed #87998e; border-radius: 0; }
 .sql { --flow: var(--sql); }
 .page { --flow: var(--page); }
 .wal { --flow: var(--wal); }
@@ -283,7 +289,7 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5p
   .node-status { font-size: clamp(8px, 2.32cqw, 12px); }
   .board-note { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .node-figure::before, .route { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .node-figure::before, .route, .flow-token { transition: none; } }
 @media (max-width: 760px) {
   .lab-layout { grid-template-columns: minmax(0, 1fr); }
   .lab-model { min-height: 240px; }

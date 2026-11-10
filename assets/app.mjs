@@ -9,10 +9,8 @@ const escape = value => String(value).replace(/[&<>"']/g, character => ({
 
 const labTones = {buffers:'page', wal:'wal', mvcc:'sql', hot:'page', vacuum:'io'};
 const flowKinds = ['sql', 'page', 'wal', 'io'];
-const autoDuration = 2700;
-const autoTravel = 1950;
-const stepTravel = 1350;
-const fadeDuration = 220;
+const mapPaces = {wide:125, compact:82};
+const stillInterval = 2700;
 
 function svg(tag, attributes) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -33,12 +31,13 @@ let selectedModule = 'buffers';
 let running = !motion.matches;
 let stepping = false;
 let overviewVisible = false;
-let elapsed = 0;
-let travelDuration = autoTravel;
+let stillElapsed = 0;
+let mapMode;
 let previousTime = 0;
 let animationFrame = 0;
-let activeToken = null;
-const fadingTokens = new Set();
+let token;
+let bridgePath;
+let segment;
 let activeRoute = null;
 let labKey = null;
 let labIndex = 0;
@@ -49,6 +48,8 @@ const nodeElements = {};
 
 function layoutMap() {
   const mode = compactMap.matches ? 'compact' : 'wide';
+  const previousMode = mapMode;
+  mapMode = mode;
   const [width, height] = mapSizes[mode];
   $('stage').style.aspectRatio = `${width} / ${height}`;
   for (const layer of [$('edges'), $('tokens')]) layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -61,8 +62,23 @@ function layoutMap() {
     paths[id].setAttribute('d', route[mode]);
     pathLengths[id] = paths[id].getTotalLength();
   }
-  if (activeToken) paintToken(activeToken);
-  for (const token of fadingTokens) paintToken(token);
+  if (segment) {
+    const previous = segment;
+    const [oldWidth, oldHeight] = mapSizes[previousMode];
+    const source = previous.source;
+    const origin = source && {
+      x:source.x * width / oldWidth, y:source.y * height / oldHeight,
+      dx:source.dx * width / oldWidth, dy:source.dy * height / oldHeight
+    };
+    segment = createSegment(previous.route, origin);
+    if (previous.distance < previous.bridgeLength) {
+      segment.distance = previous.distance / previous.bridgeLength * segment.bridgeLength;
+    } else {
+      const progress = (previous.distance - previous.bridgeLength) / previous.routeLength;
+      segment.distance = segment.bridgeLength + progress * segment.routeLength;
+    }
+    paintToken();
+  }
 }
 
 function setupOverview() {
@@ -79,6 +95,9 @@ function setupOverview() {
     paths[id] = svg('path', {class:`route ${route.kind}`, 'marker-end':`url(#arrow-${route.kind})`});
     $('edges').append(paths[id]);
   }
+  bridgePath = svg('path', {class:'route-bridge'});
+  $('edges').append(bridgePath);
+  token = createToken();
   layoutMap();
   compactMap.addEventListener('change', layoutMap);
 
@@ -142,62 +161,110 @@ function renderEvent() {
   updateInspection(state);
 }
 
-function createToken(event) {
-  const width = Math.max(64, 28 + event.object.length * 6.4);
-  const rect = svg('rect', {x:-width/2, y:-11, width, height:22, rx:11});
-  const dot = svg('circle', {cx:11-width/2, cy:0, r:3});
-  const label = svg('text', {x:6, y:0});
-  label.textContent = event.object;
-  const element = svg('g', {class:`flow-token ${event.kind}`, opacity:0});
-  element.append(rect, dot, label);
+function createToken() {
+  const element = svg('g', {class:'flow-token'});
+  const rect = svg('rect', {y:-11, height:22, rx:11});
+  const dot = svg('circle', {cy:0, r:3});
+  const oldLabel = svg('text', {x:6, y:0});
+  const newLabel = svg('text', {x:6, y:0});
+  element.append(rect, dot, oldLabel, newLabel);
   $('tokens').append(element);
-  return {element, route:event.via, progress:0, opacity:0};
+  return {element, rect, dot, oldLabel, newLabel, width:64, mix:1, sample:null};
 }
 
-function paintToken(token) {
-  const point = paths[token.route].getPointAtLength(pathLengths[token.route] * token.progress);
-  token.element.setAttribute('transform', `translate(${point.x} ${point.y})`);
-  token.element.setAttribute('opacity', token.opacity);
+function pathSample(path, distance, length) {
+  const point = path.getPointAtLength(distance);
+  const before = path.getPointAtLength(Math.max(0, distance - 1));
+  const after = path.getPointAtLength(Math.min(length, distance + 1));
+  return {x:point.x, y:point.y, dx:after.x - before.x, dy:after.y - before.y};
 }
 
-function paintFrame(delta = 0) {
-  const fraction = Math.min(elapsed / travelDuration, 1);
-  activeToken.progress = motion.matches ? .5 : fraction * fraction * (3 - 2 * fraction);
-  activeToken.opacity = motion.matches ? 1 : Math.min(elapsed / fadeDuration, 1);
-  paintToken(activeToken);
-  for (const token of fadingTokens) {
-    token.opacity = Math.max(0, token.opacity - delta / fadeDuration);
-    if (motion.matches || token.opacity === 0) {
-      token.element.remove();
-      fadingTokens.delete(token);
-    } else {
-      token.element.setAttribute('opacity', token.opacity);
-    }
+function controlPoint(sample, offset) {
+  const size = Math.hypot(sample.dx, sample.dy) || 1;
+  return `${sample.x + sample.dx / size * offset} ${sample.y + sample.dy / size * offset}`;
+}
+
+function createSegment(route, source) {
+  const routeLength = pathLengths[route];
+  const start = pathSample(paths[route], 0, routeLength);
+  const gap = source ? Math.hypot(start.x - source.x, start.y - source.y) : 0;
+  let bridgeLength = 0;
+  if (gap > .5) {
+    // Match both path tangents so the token keeps its direction at each join.
+    const handle = Math.min(45, gap * .36);
+    bridgePath.setAttribute('d', `M${source.x} ${source.y} C${controlPoint(source, handle)} ${controlPoint(start, -handle)} ${start.x} ${start.y}`);
+    bridgeLength = bridgePath.getTotalLength();
   }
+  return {route, source, routeLength, bridgeLength, distance:0, length:bridgeLength + routeLength};
+}
+
+function paintToken() {
+  const {route, distance, routeLength, bridgeLength, length} = segment;
+  const connecting = !motion.matches && distance < bridgeLength;
+  const sample = connecting
+    ? pathSample(bridgePath, distance, bridgeLength)
+    : pathSample(paths[route], motion.matches ? routeLength * .5 : distance - bridgeLength, routeLength);
+  token.sample = sample;
+  bridgePath.classList.toggle('connecting', connecting);
+  token.element.setAttribute('transform', `translate(${sample.x} ${sample.y})`);
+
+  const mix = motion.matches ? 1 : Math.min(1, distance / Math.min(length, mapPaces[mapMode] * .32));
+  if (mix === token.mix) return;
+  token.mix = mix;
+  token.width = token.fromWidth + (token.toWidth - token.fromWidth) * mix;
+  token.rect.setAttribute('x', -token.width / 2);
+  token.rect.setAttribute('width', token.width);
+  token.dot.setAttribute('cx', 11 - token.width / 2);
+  token.oldLabel.setAttribute('opacity', 1 - mix);
+  token.newLabel.setAttribute('opacity', mix);
 }
 
 function selectEvent(index) {
   eventIndex = (index + workload.steps.length) % workload.steps.length;
-  elapsed = 0;
-  travelDuration = running ? autoTravel : stepTravel;
+  const event = workload.steps[eventIndex];
+  const source = motion.matches ? null : token.sample;
+  segment = createSegment(event.via, source);
+  stillElapsed = 0;
   stepping = !running && !motion.matches;
-  if (activeToken) fadingTokens.add(activeToken);
-  activeToken = createToken(workload.steps[eventIndex]);
+  token.oldLabel.textContent = (token.mix >= .5 ? token.newLabel.textContent : token.oldLabel.textContent) || event.object;
+  token.newLabel.textContent = event.object;
+  token.fromWidth = token.width;
+  token.mix = -1;
+  token.toWidth = Math.max(64, 28 + event.object.length * 6.4);
+  token.element.setAttribute('class', `flow-token ${event.kind}`);
   renderEvent();
-  paintFrame();
+  paintToken();
+}
+
+function advanceFlow(delta) {
+  // Consume any distance left in this frame on the next segment.
+  let distance = delta * mapPaces[mapMode] * (running ? 1 : 1.45) / 1000;
+  while (distance > 0) {
+    const increment = Math.min(distance, segment.length - segment.distance);
+    segment.distance += increment;
+    distance -= increment;
+    if (segment.distance < segment.length) break;
+    if (!running) {
+      stepping = false;
+      updateOverviewControls();
+      break;
+    }
+    paintToken();
+    selectEvent(eventIndex + 1);
+  }
+  paintToken();
 }
 
 function animate(time) {
   animationFrame = 0;
   if (!(running || stepping) || !overviewVisible || document.hidden) return;
-  const delta = previousTime ? (time - previousTime) * Number($('speed').value) : 0;
+  const delta = previousTime ? Math.min(250, time - previousTime) * Number($('speed').value) : 0;
   previousTime = time;
-  elapsed += delta;
-  paintFrame(delta);
-  if (running && elapsed >= autoDuration) selectEvent(eventIndex + 1);
-  if (stepping && elapsed >= travelDuration) {
-    stepping = false;
-    updateOverviewControls();
+  if (motion.matches) {
+    stillElapsed += delta;
+    if (stillElapsed >= stillInterval) selectEvent(eventIndex + 1);
+  } else {
+    advanceFlow(delta);
   }
   if (running || stepping) animationFrame = requestAnimationFrame(animate);
 }
@@ -408,9 +475,11 @@ $('lab-play').addEventListener('click', () => {
 window.addEventListener('hashchange', () => renderLocation(true));
 document.addEventListener('visibilitychange', syncOverview);
 motion.addEventListener('change', event => {
-  if (!event.matches) return;
-  running = false;
-  stepping = false;
-  paintFrame();
+  if (event.matches) {
+    running = false;
+    stepping = false;
+  }
+  segment.distance = segment.bridgeLength + segment.routeLength / 2;
+  paintToken();
   syncOverview();
 });
