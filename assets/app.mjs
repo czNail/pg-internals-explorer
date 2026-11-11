@@ -10,6 +10,7 @@ const escape = value => String(value).replace(/[&<>"']/g, character => ({
 const labTones = {buffers:'page',wal:'wal',mvcc:'sql',hot:'page',vacuum:'io'};
 const flowKinds = ['request','response','access','page','wal'];
 const paces = {wide:160,compact:95};
+const speedInput = $('speed');
 
 function svg(tag,attributes) {
   const element=document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -255,7 +256,7 @@ function selectEvent(index) {
 function animate(time) {
   animationFrame=0;
   if (!(running||stepping)||!overviewVisible||document.hidden) return;
-  const delta=previousTime?Math.min(250,time-previousTime)*Number($('speed').value):0;
+  const delta=previousTime?Math.min(250,time-previousTime)*speedInput.valueAsNumber:0;
   previousTime=time;
   elapsed+=delta;
   paintFrame(delta);
@@ -282,6 +283,17 @@ function syncOverview() {
   animationFrame=0;
   previousTime=0;
   if ((running||stepping)&&overviewVisible&&!document.hidden) animationFrame=requestAnimationFrame(animate);
+}
+
+function updatePlaybackSpeed() {
+  const rate = speedInput.valueAsNumber;
+  const min = Number(speedInput.min);
+  const max = Number(speedInput.max);
+  const progress = (rate - min) / (max - min);
+  speedInput.style.setProperty('--speed-fill', `${progress * 100}%`);
+  speedInput.setAttribute('aria-valuetext', `${rate} 倍`);
+  $('speed-value').value = `${rate}×`;
+  $('stage').style.setProperty('--playback-rate', rate);
 }
 
 function modelCard(title, values, className = '') {
@@ -410,9 +422,11 @@ function renderLocation(focusHeading = false) {
 }
 
 setupOverview();
+updatePlaybackSpeed();
 selectEvent(0);
 renderLocation();
 
+speedInput.addEventListener('input', updatePlaybackSpeed);
 $('workloads').addEventListener('click', event => {
   const button = event.target.closest('[data-workload]');
   if (!button || workloads[button.dataset.workload] === workload) return;

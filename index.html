@@ -7,8 +7,8 @@
   <meta name="color-scheme" content="light">
   <title>PostgreSQL Internals Explorer</title>
   <link rel="icon" href="./assets/explorer.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/styles.css?rev=semantic-v1">
-  <script type="module" src="./assets/app.mjs?rev=semantic-v1"></script>
+  <link rel="stylesheet" href="./assets/styles.css?rev=playback-speed">
+  <script type="module" src="./assets/app.mjs?rev=playback-speed"></script>
 </head>
 <body>
   <a class="skip" href="#main">跳到内容</a>
@@ -27,11 +27,9 @@
     <section id="overview" aria-labelledby="overview-title">
       <div class="intro">
         <div>
-          <p class="eyebrow"><i></i> POSTGRESQL INTERNALS</p>
           <h1 id="overview-title" tabindex="-1">PostgreSQL 内核运行图</h1>
           <p class="lede">跟随查询与结果，观察进程如何访问共享页、写入日志并持久化数据。</p>
         </div>
-        <span class="model-label">机制演示 · 教学模型</span>
       </div>
       <section class="board" aria-labelledby="board-title">
         <div class="board-toolbar">
@@ -41,7 +39,11 @@
             <div class="control-row">
               <button id="run-toggle" class="primary" type="button"></button>
               <button id="run-next" class="secondary" type="button">下一步</button>
-              <label class="speed"><span class="sr-only">播放速度</span><select id="speed"><option value=".65">0.65×</option><option value="1" selected>1×</option><option value="1.65">1.65×</option></select></label>
+              <div class="speed-control">
+                <label for="speed">播放速度</label>
+                <input id="speed" type="range" min="0.35" max="2" step="0.05" value="0.8" aria-valuetext="0.8 倍">
+                <output id="speed-value" for="speed" aria-hidden="true">0.8×</output>
+              </div>
             </div>
           </div>
           <div class="event-ribbon">
@@ -66,11 +68,11 @@
       </section>
       <aside class="run-panel" aria-label="事件说明与模块检查">
         <div class="panel-section event-section">
-          <div class="panel-heading"><span class="index">01</span><h2>当前事件</h2></div>
+          <div class="panel-heading"><h2>当前事件</h2></div>
           <div id="run-event"></div>
         </div>
         <div class="panel-section module-section">
-          <div class="panel-heading"><span class="index">02</span><h2>模块检查</h2></div>
+          <div class="panel-heading"><h2>模块检查</h2></div>
           <div id="inspection"></div>
         </div>
       </aside>
