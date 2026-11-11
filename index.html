@@ -7,8 +7,8 @@
   <meta name="color-scheme" content="light">
   <title>PostgreSQL Internals Explorer</title>
   <link rel="icon" href="./assets/explorer.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/styles.css?rev=fbe5c44">
-  <script type="module" src="./assets/app.mjs?rev=fbe5c44"></script>
+  <link rel="stylesheet" href="./assets/styles.css?rev=semantic-v1">
+  <script type="module" src="./assets/app.mjs?rev=semantic-v1"></script>
 </head>
 <body>
   <a class="skip" href="#main">跳到内容</a>
@@ -29,7 +29,7 @@
         <div>
           <p class="eyebrow"><i></i> POSTGRESQL INTERNALS</p>
           <h1 id="overview-title" tabindex="-1">PostgreSQL 内核运行图</h1>
-          <p class="lede">沿着固定的架构图，观察一条请求如何访问数据页、创建行版本，并写入 WAL。</p>
+          <p class="lede">跟随查询与结果，观察进程如何访问共享页、写入日志并持久化数据。</p>
         </div>
         <span class="model-label">机制演示 · 教学模型</span>
       </div>
@@ -45,21 +45,21 @@
             </div>
           </div>
           <div class="event-ribbon">
-            <span class="step-count" id="run-counter"></span><span id="run-title"></span>
+            <span class="step-count" id="run-counter"></span><span id="run-title"></span><span id="run-actor"></span>
             <div id="run-progress" class="run-progress" role="group" aria-label="事件进度"></div>
           </div>
         </div>
         <div class="stage" id="stage">
-          <div class="map-label map-label-session"><i></i>会话与执行</div>
-          <div class="map-label map-label-memory"><i></i>共享内存与数据页</div>
-          <div class="map-label map-label-storage"><i></i>后台与持久化</div>
+          <div class="map-label map-label-session"><i></i>进程与执行</div>
+          <div class="map-label map-label-memory"><i></i>共享内存</div>
+          <div class="map-label map-label-storage"><i></i>文件存储</div>
           <svg class="map-layer" id="edges" aria-hidden="true"></svg>
           <div id="nodes"></div>
           <svg class="map-layer" id="tokens" aria-hidden="true"></svg>
         </div>
         <div class="board-foot">
           <div class="legend" aria-label="数据对象图例">
-            <span><i class="sql"></i>请求 / 事务</span><span><i class="page"></i>数据页副本</span><span><i class="wal"></i>WAL 记录</span><span><i class="io"></i>后台 I/O</span><span><i class="bridge-key"></i>事件衔接</span>
+            <span><i class="request"></i>请求 / 控制</span><span><i class="response"></i>结果返回</span><span><i class="access"></i>共享内存访问</span><span><i class="page"></i>页复制</span><span><i class="wal"></i>WAL 记录</span>
           </div>
           <span class="board-note">点模块查看机制</span>
         </div>
@@ -109,7 +109,7 @@
       </div>
     </section>
     <noscript><p class="noscript">请启用 JavaScript 以运行交互演示。</p></noscript>
-    <footer><span>PostgreSQL Internals Explorer</span><span>基于 PostgreSQL 18 的简化机制模型</span><a href="https://cznail.github.io/">返回个人主页 ↗</a></footer>
+    <footer><span>PostgreSQL Internals Explorer</span><span>PostgreSQL 18 · 普通堆表 · 同步 I/O 示例</span><a href="https://cznail.github.io/">返回个人主页 ↗</a></footer>
   </main>
 </body>
 </html>

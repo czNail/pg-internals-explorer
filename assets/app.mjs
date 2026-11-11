@@ -1,286 +1,287 @@
-import {mapSizes, modules, positions, routes, workloads, overviewState} from './overview.mjs';
-import {labs, labState} from './labs.mjs';
-import {labArt, moduleArt} from './module-art.mjs';
+import {mapSizes,modules,nestedObjects,actors,positions,routes,workloads,overviewState} from './overview.mjs?rev=semantic-v1';
+import {mapNodes,inspectionInfo} from './overview-ui.mjs?rev=semantic-v1';
+import {labs,labState} from './labs.mjs';
+import {labArt,moduleArt} from './module-art.mjs';
 
 const $ = id => document.getElementById(id);
 const escape = value => String(value).replace(/[&<>"']/g, character => ({
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
 }[character]));
+const labTones = {buffers:'page',wal:'wal',mvcc:'sql',hot:'page',vacuum:'io'};
+const flowKinds = ['request','response','access','page','wal'];
+const paces = {wide:160,compact:95};
 
-const labTones = {buffers:'page', wal:'wal', mvcc:'sql', hot:'page', vacuum:'io'};
-const flowKinds = ['sql', 'page', 'wal', 'io'];
-const mapPaces = {wide:125, compact:82};
-const stillInterval = 2700;
-
-function svg(tag, attributes) {
-  const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
-  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+function svg(tag,attributes) {
+  const element=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for (const [name,value] of Object.entries(attributes)) element.setAttribute(name,value);
   return element;
 }
 
-function markCurrent(element, current, value = 'true') {
-  if (current) element.setAttribute('aria-current', value);
+function markCurrent(element,current,value='true') {
+  if (current) element.setAttribute('aria-current',value);
   else element.removeAttribute('aria-current');
 }
 
-const motion = matchMedia('(prefers-reduced-motion: reduce)');
-const compactMap = matchMedia('(max-width: 640px)');
-let workload = workloads.mixed;
-let eventIndex = 0;
-let selectedModule = 'buffers';
-let running = !motion.matches;
-let stepping = false;
-let overviewVisible = false;
-let stillElapsed = 0;
+const motion=matchMedia('(prefers-reduced-motion: reduce)');
+const compactMap=matchMedia('(max-width: 640px)');
+let workload=workloads.mixed;
+let eventIndex=0;
+let selectedModule='buffers';
+let running=!motion.matches;
+let stepping=false;
+let overviewVisible=false;
+let elapsed=0;
+let eventDuration=0;
+let previousTime=0;
+let animationFrame=0;
 let mapMode;
-let previousTime = 0;
-let animationFrame = 0;
-let token;
-let bridgePath;
-let segment;
-let activeRoute = null;
-let labKey = null;
-let labIndex = 0;
-let labTimer = 0;
-const paths = {};
-const pathLengths = {};
-const nodeElements = {};
+let stateApplied=false;
+let displayedState;
+let transfers=[];
+let retiring=[];
+let labKey=null;
+let labIndex=0;
+let labTimer=0;
+const paths={};
+const pathLengths={};
+const nodeElements={};
+const captions={};
+const captionPositions={
+  sqlRequest:{wide:[184,145],compact:[124,115]},
+  sqlResponse:{wide:[183,254],compact:[116,253]},
+  bufferAccess:{wide:[487,106],compact:[153,300]},
+  tupleRead:{wide:[499,222],compact:[266,307]},
+  pageRead:{wide:[830,87],compact:[251,350]},
+  pageWrite:{wide:[831,207],compact:[252,473]},
+  walInsert:{wide:[475,323],compact:[54,563]},
+  walFlush:{wide:[831,364],compact:[251,742]}
+};
 
 function layoutMap() {
-  const mode = compactMap.matches ? 'compact' : 'wide';
-  const previousMode = mapMode;
-  mapMode = mode;
-  const [width, height] = mapSizes[mode];
-  $('stage').style.aspectRatio = `${width} / ${height}`;
-  for (const layer of [$('edges'), $('tokens')]) layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  for (const [id, button] of Object.entries(nodeElements)) {
-    const [x, y] = positions[id][mode];
-    button.style.left = `${x / width * 100}%`;
-    button.style.top = `${y / height * 100}%`;
+  mapMode=compactMap.matches?'compact':'wide';
+  const [width,height]=mapSizes[mapMode];
+  $('stage').style.aspectRatio=width+'/'+height;
+  for (const layer of [$('edges'),$('tokens')]) layer.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  for (const [id,node] of Object.entries(nodeElements)) {
+    const [x,y,w,h]=positions[id][mapMode];
+    Object.assign(node.style,{left:x/width*100+'%',top:y/height*100+'%',width:w/width*100+'%',height:h/height*100+'%'});
   }
-  for (const [id, route] of Object.entries(routes)) {
-    paths[id].setAttribute('d', route[mode]);
-    pathLengths[id] = paths[id].getTotalLength();
-  }
-  if (segment) {
-    const previous = segment;
-    const [oldWidth, oldHeight] = mapSizes[previousMode];
-    const source = previous.source;
-    const origin = source && {
-      x:source.x * width / oldWidth, y:source.y * height / oldHeight,
-      dx:source.dx * width / oldWidth, dy:source.dy * height / oldHeight
-    };
-    segment = createSegment(previous.route, origin);
-    if (previous.distance < previous.bridgeLength) {
-      segment.distance = previous.distance / previous.bridgeLength * segment.bridgeLength;
-    } else {
-      const progress = (previous.distance - previous.bridgeLength) / previous.routeLength;
-      segment.distance = segment.bridgeLength + progress * segment.routeLength;
+  for (const [id,route] of Object.entries(routes)) {
+    paths[id].setAttribute('d',route[mapMode]);
+    pathLengths[id]=paths[id].getTotalLength();
+    if (captions[id]) {
+      const [x,y]=captionPositions[id][mapMode];
+      captions[id].style.left=x/width*100+'%';
+      captions[id].style.top=y/height*100+'%';
     }
-    paintToken();
+  }
+  for (const transfer of [...transfers,...retiring]) {
+    transfer.duration=travelTime(transfer.flow);
+    paintTransfer(transfer,transfer.progress,transfer.opacity);
+  }
+  if (transfers.length) {
+    const progress=eventDuration?elapsed/eventDuration:0;
+    eventDuration=durationForEvent(workload.steps[eventIndex]);
+    elapsed=eventDuration*progress;
   }
 }
 
 function setupOverview() {
-  $('nodes').innerHTML = Object.entries(modules).map(([id, module]) =>
-    `<button class="node art-${module.color ?? 'sql'}" type="button" data-module="${id}" aria-controls="inspection">
-      <span class="node-figure">${moduleArt(id)}</span><span class="node-title">${module.name}</span><span class="node-status"></span></button>`
-  ).join('');
-  for (const button of $('nodes').querySelectorAll('button')) nodeElements[button.dataset.module] = button;
-  $('edges').innerHTML = `<defs>${flowKinds.map(kind => `
+  $('nodes').innerHTML=mapNodes();
+  for (const node of $('nodes').querySelectorAll('[data-node]')) nodeElements[node.dataset.node]=node;
+  $('edges').innerHTML=`<defs>${flowKinds.map(kind=>`
     <marker id="arrow-${kind}" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
       <path class="${kind} marker-tip" d="M1.5 1.5 7 4.5 1.5 7.5"/>
     </marker>`).join('')}</defs>`;
-  for (const [id, route] of Object.entries(routes)) {
-    paths[id] = svg('path', {class:`route ${route.kind}`, 'marker-end':`url(#arrow-${route.kind})`});
+  for (const [id,route] of Object.entries(routes)) {
+    paths[id]=svg('path',{'data-route':id,class:`route ${route.kind}${route.optional?' optional':''}`,'marker-end':`url(#arrow-${route.kind})`});
     $('edges').append(paths[id]);
+    if (captionPositions[id]) {
+      captions[id]=document.createElement('span');
+      captions[id].className='route-caption '+route.kind;
+      captions[id].textContent=route.label;
+      $('stage').append(captions[id]);
+    }
   }
-  bridgePath = svg('path', {class:'route-bridge'});
-  $('edges').append(bridgePath);
-  token = createToken();
   layoutMap();
-  compactMap.addEventListener('change', layoutMap);
-
-  $('workloads').innerHTML = Object.entries(workloads).map(([id, option]) =>
-    `<button type="button" data-workload="${id}" aria-pressed="${option === workload}">${option.label}</button>`).join('');
-  $('lab-cards').innerHTML = Object.entries(labs).map(([id, lab]) =>
+  compactMap.addEventListener('change',layoutMap);
+  $('workloads').innerHTML=Object.entries(workloads).map(([id,option])=>
+    `<button type="button" data-workload="${id}" aria-pressed="${option===workload}">${option.label}</button>`).join('');
+  $('lab-cards').innerHTML=Object.entries(labs).map(([id,lab])=>
     `<a class="lab-card art-${labTones[id]}" href="#${id}"><span class="card-icon">${moduleArt(labArt[id])}</span><span><strong>${lab.label}</strong><small>${lab.subtitle}</small></span><span class="card-arrow" aria-hidden="true">↗</span></a>`).join('');
-  $('lab-nav').innerHTML = Object.entries(labs).map(([id, lab]) => `<a href="#${id}">${lab.label}</a>`).join('');
+  $('lab-nav').innerHTML=Object.entries(labs).map(([id,lab])=>`<a href="#${id}">${lab.label}</a>`).join('');
 }
 
 function updateInspection(state) {
-  const module = modules[selectedModule];
-  if ($('inspection').dataset.module !== selectedModule) {
-    $('inspection').dataset.module = selectedModule;
-    $('inspection').innerHTML = `<div class="inspection-heading">
-      <span class="inspection-figure art-${module.color ?? 'sql'}">${moduleArt(selectedModule)}</span><h3>${module.name}</h3></div>
-    <p>${module.role}</p>
-    <span class="inspection-status"></span>
-    <a class="inspection-link" href="#${module.lab}">查看${labs[module.lab].label}演示 <span aria-hidden="true">↗</span></a>`;
+  const info=inspectionInfo(selectedModule);
+  if ($('inspection').dataset.module!==selectedModule) {
+    $('inspection').dataset.module=selectedModule;
+    $('inspection').innerHTML=`<div class="inspection-heading"><span class="inspection-figure art-${info.tone}">${moduleArt(info.art)}</span><h3>${info.name}</h3></div>
+      <p>${info.role}</p><span class="inspection-status"></span><a class="inspection-link" href="#${info.lab}">查看${labs[info.lab].label}演示 ↗</a>`;
   }
-  $('inspection').querySelector('.inspection-status').textContent = state[selectedModule];
+  const value=selectedModule==='page'?state.heap:actors[selectedModule]?.module==='background'
+    ?state.workers[selectedModule]:selectedModule==='index'?'堆页与索引页共用缓冲区':state[selectedModule];
+  $('inspection').querySelector('.inspection-status').textContent=value;
+  for (const [id,node] of Object.entries(nodeElements)) {
+    node.classList.toggle('selected',id===(nestedObjects[selectedModule]?.parent??actors[selectedModule]?.module??selectedModule));
+  }
+  for (const button of $('nodes').querySelectorAll('[data-inspect]')) button.setAttribute('aria-pressed',String(button.dataset.inspect===selectedModule));
+}
+
+function renderState(index) {
+  displayedState=overviewState(workload,index);
+  const state=displayedState;
+  for (const field of $('nodes').querySelectorAll('[data-status]')) field.textContent=state[field.dataset.status];
+  for (const phase of $('nodes').querySelectorAll('[data-phase]')) phase.classList.toggle('phase-active',phase.dataset.phase===state.phase);
+  $('frame-bits').textContent=state.loaded?`pin ${state.pin} · ${state.dirty?'Dirty':'Clean'}`:'空闲';
+  $('page-identity').textContent=state.loaded?'P8 · Heap Page':'等待读入 P8';
+  $('page-value').textContent=state.loaded?`balance ${state.pageValue}`:'accounts/main/8';
+  $('page-lsn').textContent=state.loaded?'LSN '+state.pageLsn:'';
+  $('page-object').classList.toggle('loaded',state.loaded);
+  $('page-object').classList.toggle('dirty',state.dirty);
+  $('disk-title').textContent='P8 · balance '+state.diskValue;
+  $('disk-state').textContent=`written ${state.diskWritten} · durable ${state.diskDurable}`;
+  $('wal-lsn').textContent=`inserted ${state.inserted} · flushed ${state.flushed}`;
+  const records=state.walRecords.map(([id,type,lsn])=>`<span title="${type} · 结束 LSN ${lsn}">${id} · ${type==='COMMIT'?'COMMIT':'UPDATE'}</span>`).join('')||'<span class="empty-record">等待 WAL 记录</span>';
+  if ($('wal-records').innerHTML!==records) $('wal-records').innerHTML=records;
+  for (const worker of $('nodes').querySelectorAll('[data-worker-status]')) worker.textContent=state.workers[worker.dataset.workerStatus];
+  updateInspection(state);
 }
 
 function renderProgress() {
-  if ($('run-progress').childElementCount !== workload.steps.length) {
-    $('run-progress').replaceChildren(...workload.steps.map((event, index) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.dataset.event = index;
+  if ($('run-progress').childElementCount!==workload.steps.length) {
+    $('run-progress').replaceChildren(...workload.steps.map((event,index)=>{
+      const button=document.createElement('button');
+      button.type='button';
+      button.dataset.event=index;
       return button;
     }));
   }
-  for (const [index, button] of Array.from($('run-progress').children).entries()) {
-    const title = `${index + 1}. ${workload.steps[index].title}`;
-    button.title = title;
-    button.setAttribute('aria-label', title);
-    button.classList.toggle('past', index < eventIndex);
-    markCurrent(button, index === eventIndex, 'step');
+  for (const [index,button] of Array.from($('run-progress').children).entries()) {
+    const title=`${index+1}. ${workload.steps[index].title}`;
+    button.title=title;
+    button.setAttribute('aria-label',title);
+    button.classList.toggle('past',index<eventIndex);
+    markCurrent(button,index===eventIndex,'step');
   }
 }
 
 function renderEvent() {
-  const event = workload.steps[eventIndex];
-  const state = overviewState(workload, eventIndex);
-  const route = routes[event.via];
-  if (activeRoute) paths[activeRoute].classList.remove('active');
-  activeRoute = event.via;
-  paths[activeRoute].classList.add('active');
-  for (const [id, button] of Object.entries(nodeElements)) {
-    button.querySelector('.node-status').textContent = state[id];
-    button.classList.toggle('active', id === route.from || id === route.to || event.targets.includes(id));
-    button.classList.toggle('selected', id === selectedModule);
-    button.setAttribute('aria-pressed', String(id === selectedModule));
+  const event=workload.steps[eventIndex];
+  const routeIds=new Set(event.flows.map(flow=>flow.route));
+  for (const [id,path] of Object.entries(paths)) path.classList.toggle('active',routeIds.has(id));
+  for (const [id,node] of Object.entries(nodeElements)) {
+    node.classList.toggle('active',event.targets.includes(id));
+    node.classList.toggle('local-change',!event.flows.length&&event.targets.includes(id));
   }
-  $('run-counter').textContent = `${String(eventIndex + 1).padStart(2, '0')} / ${String(workload.steps.length).padStart(2, '0')}`;
-  $('run-title').textContent = event.title;
-  $('run-event').innerHTML = `<p>${event.description}</p>
-    <div class="event-flow ${event.kind}"><span class="event-object">${escape(event.object)}</span>
-    <span class="event-path">${modules[route.from].name} → ${modules[route.to].name}</span></div>`;
+  for (const button of $('nodes').querySelectorAll('[data-actor]')) button.classList.toggle('actor-active',button.dataset.actor===event.actor);
+  for (const item of $('nodes').querySelectorAll('[data-inspect]')) item.classList.toggle('object-focus',item.dataset.inspect===event.focus);
+  $('run-counter').textContent=`${String(eventIndex+1).padStart(2,'0')} / ${String(workload.steps.length).padStart(2,'0')}`;
+  $('run-title').textContent=event.title;
+  $('run-actor').textContent='执行者 · '+actors[event.actor].name;
+  $('run-event').innerHTML=`<p>${event.description}</p><div class="event-flow"><span class="actor-tag">执行者 · ${actors[event.actor].name}</span><span class="action-tag">${event.action}</span></div>`;
   renderProgress();
-  updateInspection(state);
+  renderState(eventIndex-1);
 }
 
-function createToken() {
-  const element = svg('g', {class:'flow-token'});
-  const rect = svg('rect', {y:-11, height:22, rx:11});
-  const dot = svg('circle', {cy:0, r:3});
-  const oldLabel = svg('text', {x:6, y:0});
-  const newLabel = svg('text', {x:6, y:0});
-  element.append(rect, dot, oldLabel, newLabel);
+function travelTime(flow) {
+  return Math.max(650,pathLengths[flow.route]/paces[mapMode]*1000);
+}
+
+function durationForEvent(event) {
+  return event.flows.length?Math.max(...event.flows.map(flow=>flow.delay+travelTime(flow))):1050;
+}
+
+function createTransfer(flow) {
+  const kind=routes[flow.route].kind;
+  const width=Math.max(65,27+flow.label.length*6.3);
+  const element=svg('g',{class:'flow-token '+kind,'data-object-id':flow.id,opacity:0});
+  element.append(svg('rect',{x:-width/2,y:-11,width,height:22,rx:kind==='page'?4:11}));
+  element.append(svg(kind==='page'?'rect':'circle',kind==='page'?{x:8-width/2,y:-3,width:6,height:6,rx:1}:{cx:11-width/2,cy:0,r:3}));
+  const text=svg('text',{x:6,y:0});
+  text.textContent=flow.label;
+  element.append(text);
   $('tokens').append(element);
-  return {element, rect, dot, oldLabel, newLabel, width:64, mix:1, sample:null};
+  return {flow,element,duration:travelTime(flow),progress:0,opacity:0,retiredFor:0};
 }
 
-function pathSample(path, distance, length) {
-  const point = path.getPointAtLength(distance);
-  const before = path.getPointAtLength(Math.max(0, distance - 1));
-  const after = path.getPointAtLength(Math.min(length, distance + 1));
-  return {x:point.x, y:point.y, dx:after.x - before.x, dy:after.y - before.y};
+function paintTransfer(transfer,progress,opacity) {
+  transfer.progress=progress;
+  transfer.opacity=opacity;
+  const point=paths[transfer.flow.route].getPointAtLength(pathLengths[transfer.flow.route]*progress);
+  transfer.element.setAttribute('transform',`translate(${point.x} ${point.y})`);
+  transfer.element.setAttribute('opacity',opacity);
 }
 
-function controlPoint(sample, offset) {
-  const size = Math.hypot(sample.dx, sample.dy) || 1;
-  return `${sample.x + sample.dx / size * offset} ${sample.y + sample.dy / size * offset}`;
-}
-
-function createSegment(route, source) {
-  const routeLength = pathLengths[route];
-  const start = pathSample(paths[route], 0, routeLength);
-  const gap = source ? Math.hypot(start.x - source.x, start.y - source.y) : 0;
-  let bridgeLength = 0;
-  if (gap > .5) {
-    // Match both path tangents so the token keeps its direction at each join.
-    const handle = Math.min(45, gap * .36);
-    bridgePath.setAttribute('d', `M${source.x} ${source.y} C${controlPoint(source, handle)} ${controlPoint(start, -handle)} ${start.x} ${start.y}`);
-    bridgeLength = bridgePath.getTotalLength();
+function paintFrame(delta=0) {
+  for (const transfer of transfers) {
+    const time=elapsed-transfer.flow.delay;
+    const progress=motion.matches ? .5 : Math.max(0,Math.min(1,time/transfer.duration));
+    const opacity=motion.matches?1:Math.max(0,Math.min(1,time/160));
+    paintTransfer(transfer,progress,opacity);
   }
-  return {route, source, routeLength, bridgeLength, distance:0, length:bridgeLength + routeLength};
-}
-
-function paintToken() {
-  const {route, distance, routeLength, bridgeLength, length} = segment;
-  const connecting = !motion.matches && distance < bridgeLength;
-  const sample = connecting
-    ? pathSample(bridgePath, distance, bridgeLength)
-    : pathSample(paths[route], motion.matches ? routeLength * .5 : distance - bridgeLength, routeLength);
-  token.sample = sample;
-  bridgePath.classList.toggle('connecting', connecting);
-  token.element.setAttribute('transform', `translate(${sample.x} ${sample.y})`);
-
-  const mix = motion.matches ? 1 : Math.min(1, distance / Math.min(length, mapPaces[mapMode] * .32));
-  if (mix === token.mix) return;
-  token.mix = mix;
-  token.width = token.fromWidth + (token.toWidth - token.fromWidth) * mix;
-  token.rect.setAttribute('x', -token.width / 2);
-  token.rect.setAttribute('width', token.width);
-  token.dot.setAttribute('cx', 11 - token.width / 2);
-  token.oldLabel.setAttribute('opacity', 1 - mix);
-  token.newLabel.setAttribute('opacity', mix);
+  for (const transfer of retiring) {
+    transfer.retiredFor+=delta;
+    paintTransfer(transfer,transfer.progress,transfer.retiredOpacity*Math.max(0,1-transfer.retiredFor/220));
+    if (transfer.retiredFor>=220||motion.matches) transfer.element.remove();
+  }
+  retiring=retiring.filter(transfer=>transfer.element.isConnected);
+  const event=workload.steps[eventIndex];
+  if (!stateApplied&&(motion.matches||elapsed>=eventDuration*(event.flows.length?1:.5))) {
+    stateApplied=true;
+    renderState(eventIndex);
+  }
 }
 
 function selectEvent(index) {
-  eventIndex = (index + workload.steps.length) % workload.steps.length;
-  const event = workload.steps[eventIndex];
-  const source = motion.matches ? null : token.sample;
-  segment = createSegment(event.via, source);
-  stillElapsed = 0;
-  stepping = !running && !motion.matches;
-  token.oldLabel.textContent = (token.mix >= .5 ? token.newLabel.textContent : token.oldLabel.textContent) || event.object;
-  token.newLabel.textContent = event.object;
-  token.fromWidth = token.width;
-  token.mix = -1;
-  token.toWidth = Math.max(64, 28 + event.object.length * 6.4);
-  token.element.setAttribute('class', `flow-token ${event.kind}`);
-  renderEvent();
-  paintToken();
-}
-
-function advanceFlow(delta) {
-  // Consume any distance left in this frame on the next segment.
-  let distance = delta * mapPaces[mapMode] * (running ? 1 : 1.45) / 1000;
-  while (distance > 0) {
-    const increment = Math.min(distance, segment.length - segment.distance);
-    segment.distance += increment;
-    distance -= increment;
-    if (segment.distance < segment.length) break;
-    if (!running) {
-      stepping = false;
-      updateOverviewControls();
-      break;
+  eventIndex=(index+workload.steps.length)%workload.steps.length;
+  for (const transfer of transfers) {
+    if (transfer.opacity>0) {
+      transfer.retiredOpacity=transfer.opacity;
+      retiring.push(transfer);
     }
-    paintToken();
-    selectEvent(eventIndex + 1);
+    else transfer.element.remove();
   }
-  paintToken();
+  elapsed=0;
+  stateApplied=false;
+  const event=workload.steps[eventIndex];
+  transfers=event.flows.map(createTransfer);
+  eventDuration=durationForEvent(event);
+  stepping=!running&&!motion.matches;
+  renderEvent();
+  paintFrame();
 }
 
 function animate(time) {
-  animationFrame = 0;
-  if (!(running || stepping) || !overviewVisible || document.hidden) return;
-  const delta = previousTime ? Math.min(250, time - previousTime) * Number($('speed').value) : 0;
-  previousTime = time;
-  if (motion.matches) {
-    stillElapsed += delta;
-    if (stillElapsed >= stillInterval) selectEvent(eventIndex + 1);
-  } else {
-    advanceFlow(delta);
+  animationFrame=0;
+  if (!(running||stepping)||!overviewVisible||document.hidden) return;
+  const delta=previousTime?Math.min(250,time-previousTime)*Number($('speed').value):0;
+  previousTime=time;
+  elapsed+=delta;
+  paintFrame(delta);
+  if (elapsed>=eventDuration) {
+    if (running) selectEvent(eventIndex+1);
+    else {
+      stepping=false;
+      updateOverviewControls();
+    }
   }
-  if (running || stepping) animationFrame = requestAnimationFrame(animate);
+  if (running||stepping) animationFrame=requestAnimationFrame(animate);
 }
 
 function updateOverviewControls() {
-  $('play-state').textContent = running ? '播放中' : stepping ? '单步中' : '已暂停';
-  $('live-state').classList.toggle('running', running || stepping);
-  $('run-toggle').textContent = running ? 'Ⅱ 暂停' : '▶ 播放';
+  $('play-state').textContent=running?'播放中':stepping?'单步中':'已暂停';
+  $('live-state').classList.toggle('running',running||stepping);
+  $('run-toggle').textContent=running?'Ⅱ 暂停':'▶ 播放';
+  $('stage').classList.toggle('motion-paused',!(running||stepping));
 }
 
 function syncOverview() {
   updateOverviewControls();
   if (animationFrame) cancelAnimationFrame(animationFrame);
-  animationFrame = 0;
-  previousTime = 0;
-  if ((running || stepping) && overviewVisible && !document.hidden) animationFrame = requestAnimationFrame(animate);
+  animationFrame=0;
+  previousTime=0;
+  if ((running||stepping)&&overviewVisible&&!document.hidden) animationFrame=requestAnimationFrame(animate);
 }
 
 function modelCard(title, values, className = '') {
@@ -434,14 +435,10 @@ $('run-progress').addEventListener('click', event => {
   syncOverview();
 });
 $('nodes').addEventListener('click', event => {
-  const button = event.target.closest('[data-module]');
+  const button = event.target.closest('[data-inspect]');
   if (!button) return;
-  selectedModule = button.dataset.module;
-  for (const node of Object.values(nodeElements)) {
-    node.classList.toggle('selected', node === button);
-    node.setAttribute('aria-pressed', String(node === button));
-  }
-  updateInspection(overviewState(workload, eventIndex));
+  selectedModule = button.dataset.inspect;
+  updateInspection(displayedState);
   $('inspection').scrollIntoView({block:'nearest', behavior:motion.matches ? 'instant' : 'smooth'});
 });
 
@@ -479,7 +476,6 @@ motion.addEventListener('change', event => {
     running = false;
     stepping = false;
   }
-  segment.distance = segment.bridgeLength + segment.routeLength / 2;
-  paintToken();
+  paintFrame();
   syncOverview();
 });
