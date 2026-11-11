@@ -1,8 +1,11 @@
+import { memoryLabs } from './memory.mjs';
+
 const docs = 'https://www.postgresql.org/docs/18/';
 const src = 'https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/';
 const step = (title, detail, patch = {}) => ({title, detail, patch});
 
 export const labs = {
+  ...memoryLabs,
   buffers: {
     label:'共享缓冲区', title:'Shared Buffers', subtitle:'命中、Pin 与时钟扫描',
     summary:'跟踪一次缓冲命中，再观察缓冲区满时 CLOCK-sweep 如何选出可替换的帧。',

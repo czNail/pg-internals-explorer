@@ -8,9 +8,9 @@
   <meta name="theme-color" content="#f5f7f3">
   <title>PostgreSQL Internals Explorer</title>
   <link rel="icon" href="./assets/explorer.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/styles.css?rev=color-theme">
+  <link rel="stylesheet" href="./assets/styles.css?rev=memory-lab">
   <script src="./assets/site-theme.js"></script>
-  <script type="module" src="./assets/app.mjs?rev=playback-speed"></script>
+  <script type="module" src="./assets/app.mjs?rev=memory-lab"></script>
 </head>
 <body>
   <a class="skip" href="#main">跳到内容</a>
@@ -20,7 +20,7 @@
       <a class="brand" href="#overview"><img src="./assets/explorer.svg" width="36" height="36" alt=""><span>PostgreSQL<strong>Internals Explorer</strong></span></a>
       <nav aria-label="主导航">
         <a id="nav-overview" href="#overview">全局运行</a>
-        <a id="nav-labs" href="#buffers">模块演示</a>
+        <a id="nav-labs" href="#shared-memory">模块演示</a>
       </nav>
       <div class="top-actions">
         <a class="top-link" href="https://github.com/czNail/pg-internals-explorer">GitHub <span aria-hidden="true">↗</span></a>
@@ -97,6 +97,7 @@
         <span class="model-label">模块演示 · 可逐步回放</span>
       </div>
       <nav id="lab-nav" class="lab-nav" aria-label="选择模块"></nav>
+      <nav id="lab-scenarios" class="lab-scenarios" aria-label="共享内存场景" hidden></nav>
       <div class="playback">
         <div class="playback-buttons"><button class="secondary" id="lab-reset" type="button" title="回到初始状态">↺ 重置</button><button class="secondary" id="lab-prev" type="button">← 上一步</button><button class="primary" id="lab-play" type="button"></button><button class="secondary" id="lab-next" type="button">下一步 →</button></div>
         <a id="lab-source" target="_blank" rel="noopener noreferrer">查阅 PostgreSQL 资料 ↗</a>

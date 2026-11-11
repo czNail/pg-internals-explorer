@@ -1,13 +1,16 @@
 import {mapSizes,modules,nestedObjects,actors,positions,routes,workloads,overviewState} from './overview.mjs?rev=semantic-v1';
 import {mapNodes,inspectionInfo} from './overview-ui.mjs?rev=semantic-v1';
-import {labs,labState} from './labs.mjs';
-import {labArt,moduleArt} from './module-art.mjs';
+import {labs,labState} from './labs.mjs?rev=memory-lab';
+import {labArt,moduleArt} from './module-art.mjs?rev=memory-lab';
+import {memoryLabs} from './memory.mjs';
+import {mountMemoryScene} from './memory-view.mjs';
 
 const $ = id => document.getElementById(id);
 const escape = value => String(value).replace(/[&<>"']/g, character => ({
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
 }[character]));
-const labTones = {buffers:'page',wal:'wal',mvcc:'sql',hot:'page',vacuum:'io'};
+const labTones = {'shared-memory':'sql',buffers:'page',wal:'wal',mvcc:'sql',hot:'page',vacuum:'io'};
+const labEntries = Object.entries(labs).filter(([, lab]) => !lab.module);
 const flowKinds = ['request','response','access','page','wal'];
 const paces = {wide:160,compact:95};
 const speedInput = $('speed');
@@ -43,6 +46,7 @@ let retiring=[];
 let labKey=null;
 let labIndex=0;
 let labTimer=0;
+let renderMemoryScene=null;
 const paths={};
 const pathLengths={};
 const nodeElements={};
@@ -108,9 +112,9 @@ function setupOverview() {
   compactMap.addEventListener('change',layoutMap);
   $('workloads').innerHTML=Object.entries(workloads).map(([id,option])=>
     `<button type="button" data-workload="${id}" aria-pressed="${option===workload}">${option.label}</button>`).join('');
-  $('lab-cards').innerHTML=Object.entries(labs).map(([id,lab])=>
+  $('lab-cards').innerHTML=labEntries.map(([id,lab])=>
     `<a class="lab-card art-${labTones[id]}" href="#${id}"><span class="card-icon">${moduleArt(labArt[id])}</span><span><strong>${lab.label}</strong><small>${lab.subtitle}</small></span><span class="card-arrow" aria-hidden="true">↗</span></a>`).join('');
-  $('lab-nav').innerHTML=Object.entries(labs).map(([id,lab])=>`<a href="#${id}">${lab.label}</a>`).join('');
+  $('lab-nav').innerHTML=labEntries.map(([id,lab])=>`<a href="#${id}">${lab.label}</a>`).join('');
 }
 
 function updateInspection(state) {
@@ -371,11 +375,14 @@ function stopLab() {
 function renderLabStep() {
   const lab = labs[labKey];
   const event = lab.steps[labIndex];
-  $('lab-model').innerHTML = models[labKey](labState(lab, labIndex));
+  const state = labState(lab, labIndex);
+  if (renderMemoryScene) renderMemoryScene(state);
+  else $('lab-model').innerHTML = models[labKey](state);
   $('lab-explanation').innerHTML = `<h3>${event.title}</h3><p>${event.detail}</p>`;
   $('lab-counter').textContent = `${labIndex + 1} / ${lab.steps.length}`;
   $('lab-prev').disabled = labIndex === 0;
   $('lab-next').disabled = labIndex === lab.steps.length - 1;
+  $('lab-next').textContent = `${lab.steps[labIndex + 1]?.action ?? '下一步'} →`;
   for (const button of $('lab-steps').querySelectorAll('button')) {
     markCurrent(button, Number(button.dataset.step) === labIndex, 'step');
   }
@@ -383,12 +390,15 @@ function renderLabStep() {
 
 function openLab(key) {
   const lab = labs[key];
+  const moduleKey = lab.module ?? key;
+  const isMemoryScene = Object.hasOwn(memoryLabs, key);
   labKey = key;
   labIndex = 0;
-  $('lab-kicker').textContent = `MODULE LABS / ${String(Object.keys(labs).indexOf(key) + 1).padStart(2, '0')}`;
+  $('lab-kicker').textContent = isMemoryScene ? lab.label :
+    `MODULE LABS / ${String(labEntries.findIndex(([id]) => id === moduleKey) + 1).padStart(2, '0')}`;
   $('lab-title').textContent = lab.title;
-  $('lab-figure').className = `lab-figure art-${labTones[key]}`;
-  $('lab-figure').innerHTML = moduleArt(labArt[key]);
+  $('lab-figure').className = `lab-figure art-${labTones[moduleKey]}`;
+  $('lab-figure').innerHTML = moduleArt(labArt[moduleKey]);
   $('lab-summary').textContent = lab.summary;
   $('model-title').textContent = lab.view;
   $('lab-context').textContent = lab.context;
@@ -396,7 +406,14 @@ function openLab(key) {
   $('lab-source').href = lab.source;
   $('lab-steps').innerHTML = lab.steps.map((event, index) =>
     `<li><button type="button" data-step="${index}"><span>${String(index + 1).padStart(2, '0')}</span>${event.title}</button></li>`).join('');
-  for (const link of $('lab-nav').children) markCurrent(link, link.hash === `#${key}`, 'page');
+  for (const link of $('lab-nav').children) markCurrent(link, link.hash === `#${moduleKey}`, 'page');
+  $('labs').classList.toggle('memory-lab', isMemoryScene);
+  $('lab-scenarios').hidden = !isMemoryScene;
+  if (isMemoryScene) {
+    $('lab-scenarios').innerHTML = Object.entries(memoryLabs).map(([id, scene]) =>
+      `<a href="#${id}"${id === key ? ' aria-current="page"' : ''}>${scene.scene}</a>`).join('');
+  }
+  renderMemoryScene = isMemoryScene ? mountMemoryScene($('lab-model'), key) : null;
   renderLabStep();
 }
 
@@ -480,7 +497,7 @@ $('lab-play').addEventListener('click', () => {
     labIndex++;
     renderLabStep();
     if (labIndex === lastStep) stopLab();
-  }, 2000);
+  }, renderMemoryScene ? 3200 : 2000);
   syncLabPlay();
 });
 window.addEventListener('hashchange', () => renderLocation(true));

@@ -75,3 +75,49 @@ test('the WAL lab can rewind across the file-write boundary',()=>{
   assert.notEqual(written.written,written.durable);
   assert.deepEqual(labState(lab,3),committed);
 });
+
+test('a configuration reload leaves the connection limit and shared layout active until restart', () => {
+  const lab = labs['shared-memory'];
+  const edited = labState(lab, 1);
+  assert.equal(edited.configured, 200);
+  assert.equal(edited.pending, false);
+  const reloaded = labState(lab, 2);
+  assert.equal(reloaded.setting, 100);
+  assert.equal(reloaded.pending, true);
+  assert.equal(reloaded.layout, 'original');
+  const stopped = labState(lab, 3);
+  assert.equal(stopped.setting, null);
+  assert.equal(stopped.layout, 'none');
+  const starting = labState(lab, 4);
+  assert.equal(starting.instance, 'starting');
+  assert.equal(starting.layout, 'expanded');
+  assert.equal(starting.setting, null);
+  const restarted = labState(lab, 5);
+  assert.equal(restarted.setting, 200);
+  assert.equal(restarted.pending, false);
+  assert.equal(restarted.instance, 'online');
+  assert.deepEqual(labState(lab, 2), reloaded);
+});
+
+test('an unpinned DSM segment survives its creator and is released after the last mapping', () => {
+  const lab = labs['shared-memory/dsm'];
+  const states = lab.steps.map((_, index) => labState(lab, index));
+  assert.deepEqual(states.map(state => state.mapped.length), [0, 1, 2, 3, 2, 1, 0]);
+  assert.deepEqual(states[4].mapped, ['worker-a', 'worker-b']);
+  assert.deepEqual(states[5].mapped, ['worker-b']);
+  assert.equal(states[5].segment, 'alive');
+  assert.equal(states[6].segment, 'released');
+  assert.deepEqual(labState(lab, 5), states[5]);
+});
+
+test('the hypothetical migration cannot release the layout while Backend B still references it', () => {
+  const lab = labs['shared-memory/online'];
+  const waiting = labState(lab, 2);
+  assert.equal(waiting.backendA, 'new');
+  assert.equal(waiting.backendB, 'old');
+  assert.equal(waiting.oldLayout, 'alive');
+  const switched = labState(lab, 3);
+  assert.equal(switched.backendB, 'new');
+  assert.equal(switched.oldLayout, 'alive');
+  assert.equal(labState(lab, 4).oldLayout, 'released');
+});

@@ -1,5 +1,13 @@
 // Each illustration uses the module's own silhouette and the map's color palette.
 const art = {
+  memory: `
+    <rect x="7" y="16" width="66" height="31" rx="8" fill="var(--art-light)"/>
+    <rect x="14" y="22" width="14" height="17" rx="3" fill="var(--art-ink)"/>
+    <rect x="33" y="22" width="14" height="17" rx="3" fill="var(--art-mid)"/>
+    <rect x="52" y="22" width="14" height="17" rx="3" fill="var(--art-ink)"/>
+    <path d="M19 31h4m15 0h4m15 0h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M17 47v6m11-6v6m12-6v6m12-6v6m11-6v6" stroke="var(--art-mid)" stroke-width="2.5" stroke-linecap="round"/>
+  `,
   client: `
     <rect x="10" y="11" width="60" height="43" rx="8" fill="var(--art-light)"/>
     <path d="M10 20a9 9 0 0 1 9-9h42a9 9 0 0 1 9 9v4H10Z" fill="var(--art-mid)"/>
@@ -73,7 +81,7 @@ const art = {
   `
 };
 
-export const labArt = {buffers:'buffers', wal:'wal', mvcc:'snapshot', hot:'heap', vacuum:'vacuum'};
+export const labArt = {'shared-memory':'memory', buffers:'buffers', wal:'wal', mvcc:'snapshot', hot:'heap', vacuum:'vacuum'};
 
 export function moduleArt(id) {
   return `<svg viewBox="0 0 80 64" aria-hidden="true" focusable="false">${art[id]}</svg>`;
